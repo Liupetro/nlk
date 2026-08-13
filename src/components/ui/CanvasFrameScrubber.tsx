@@ -6,30 +6,37 @@ type CanvasFrameScrubberProps = {
   totalFrames?: number;
   folderPath?: string;
   className?: string;
-  overlayOpacity?: number; // default 0.4
-  blurAmount?: string; // default "blur-[0.5px]" (very subtle/minimal blur)
+  overlayOpacity?: number;
+  blurAmount?: string;
 };
 
-/** On-disk sequence length. Virtual frames are sampled evenly from these. */
+/** On-disk sequence. Virtual frames take every Nth file (192 / 48 → step 4). */
 const SOURCE_TOTAL = 192;
 const MOBILE_MAX_WIDTH = 767;
-const WINDOW_RADIUS = 6;
-const PREFETCH_AHEAD = 4;
+const WINDOW_RADIUS = 5;
+const HARD_EVICT_RADIUS = WINDOW_RADIUS * 2;
+const MAX_CANVAS_CSS_WIDTH = 1280;
+const MAX_DPR = 1.5;
+const MIN_FRAME_MS = 1000 / 30;
+const LERP = 0.28;
 
 function sourceFrameNumber(index: number, virtualTotal: number): number {
   if (virtualTotal <= 1) return 1;
-  const t = Math.max(0, Math.min(virtualTotal - 1, index));
-  return 1 + Math.round((t / (virtualTotal - 1)) * (SOURCE_TOTAL - 1));
+  const step = SOURCE_TOTAL / virtualTotal;
+  return 1 + Math.round(index * step);
 }
 
 function frameUrl(folderPath: string, sourceNum: number): string {
   return `${folderPath}/frame_${String(sourceNum).padStart(3, "0")}.jpg`;
 }
 
+function clamp(n: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, n));
+}
+
 /**
- * Interactive hero background: lazily loads a sampled window of frames
- * and scrubs them with mouse/touch X (smooth lerp via requestAnimationFrame).
- * On mobile (<768px) or reduced-motion, a static poster is used instead.
+ * Desktop hero scrubber: sampled JPEG sequence, small decoded window,
+ * 30fps rAF updates. Mobile / reduced-motion → static poster only.
  */
 export function CanvasFrameScrubber({
   totalFrames = 48,
@@ -40,159 +47,18 @@ export function CanvasFrameScrubber({
 }: CanvasFrameScrubberProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-
-  const cacheRef = useRef<Map<number, HTMLImageElement>>(new Map());
-  const inflightRef = useRef<Set<number>>(new Set());
-  const loadQueueRef = useRef<number[]>([]);
-  const flushScheduledRef = useRef(false);
-
-  const targetFrameRef = useRef((totalFrames - 1) / 2);
-  const currentFrameRef = useRef((totalFrames - 1) / 2);
-  const framesRef = useRef(totalFrames);
-  const folderRef = useRef(folderPath);
-  const rafRef = useRef<number | null>(null);
-  const shownRef = useRef(false);
-  const staticRef = useRef(false);
-
   const [canvasReady, setCanvasReady] = useState(false);
   const [staticPoster, setStaticPoster] = useState(true);
 
-  folderRef.current = folderPath;
-  framesRef.current = totalFrames;
+  const midIndex = Math.round((totalFrames - 1) / 2);
+  const posterSrc = frameUrl(folderPath, sourceFrameNumber(midIndex, totalFrames));
 
-  const posterSrc = frameUrl(
-    folderPath,
-    sourceFrameNumber(Math.floor((totalFrames - 1) / 2), totalFrames),
-  );
-
-  const nearestImage = (frameIdx: number): HTMLImageElement | null => {
-    const cache = cacheRef.current;
-    if (cache.size === 0) return null;
-    const exact = Math.round(frameIdx);
-    const hit = cache.get(exact);
-    if (hit) return hit;
-    const count = framesRef.current;
-    for (let d = 1; d < count; d++) {
-      const a = cache.get(exact + d);
-      if (a) return a;
-      const b = cache.get(exact - d);
-      if (b) return b;
-    }
-    return null;
-  };
-
-  const drawFrame = (frameIdx: number) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d", { alpha: false });
-    if (!ctx) return;
-
-    const img = nearestImage(frameIdx);
-    if (!img || !img.complete || img.naturalWidth === 0) return;
-
-    const cw = canvas.width;
-    const ch = canvas.height;
-    const iw = img.naturalWidth;
-    const ih = img.naturalHeight;
-    const scale = Math.max(cw / iw, ch / ih);
-    const nw = iw * scale;
-    const nh = ih * scale;
-
-    ctx.drawImage(img, (cw - nw) / 2, (ch - nh) / 2, nw, nh);
-  };
-
-  const startLoad = (index: number) => {
-    if (index < 0 || index >= framesRef.current) return;
-    if (cacheRef.current.has(index) || inflightRef.current.has(index)) return;
-
-    inflightRef.current.add(index);
-    const img = new Image();
-    img.decoding = "async";
-    img.src = frameUrl(
-      folderRef.current,
-      sourceFrameNumber(index, framesRef.current),
-    );
-
-    img.onload = () => {
-      inflightRef.current.delete(index);
-      cacheRef.current.set(index, img);
-      if (!shownRef.current) {
-        shownRef.current = true;
-        drawFrame(currentFrameRef.current);
-        setCanvasReady(true);
-      } else if (Math.abs(index - currentFrameRef.current) < 1.5) {
-        drawFrame(currentFrameRef.current);
-      }
-    };
-
-    img.onerror = () => {
-      inflightRef.current.delete(index);
-    };
-  };
-
-  const flushQueue = () => {
-    flushScheduledRef.current = false;
-    if (staticRef.current) {
-      loadQueueRef.current = [];
-      return;
-    }
-    // A couple of requests per frame — avoids a decode storm on the main thread.
-    const batch = loadQueueRef.current.splice(0, 2);
-    for (const index of batch) startLoad(index);
-    if (loadQueueRef.current.length > 0) {
-      flushScheduledRef.current = true;
-      requestAnimationFrame(flushQueue);
-    }
-  };
-
-  const enqueue = (index: number) => {
-    if (index < 0 || index >= framesRef.current) return;
-    if (cacheRef.current.has(index) || inflightRef.current.has(index)) return;
-    if (loadQueueRef.current.includes(index)) return;
-    loadQueueRef.current.push(index);
-    if (!flushScheduledRef.current) {
-      flushScheduledRef.current = true;
-      requestAnimationFrame(flushQueue);
-    }
-  };
-
-  const ensureWindow = (center: number) => {
-    const count = framesRef.current;
-    const c = Math.round(center);
-    const dir = Math.sign(targetFrameRef.current - currentFrameRef.current);
-    const start = Math.max(0, c - WINDOW_RADIUS);
-    const end = Math.min(count - 1, c + WINDOW_RADIUS);
-
-    for (let i = start; i <= end; i++) enqueue(i);
-
-    if (dir !== 0) {
-      for (let k = 1; k <= PREFETCH_AHEAD; k++) {
-        enqueue(c + dir * (WINDOW_RADIUS + k));
-      }
-    }
-  };
-
-  // Mobile / reduced-motion → static poster. Desktop → lazy scrubber.
   useEffect(() => {
     const mobileMq = window.matchMedia(`(max-width: ${MOBILE_MAX_WIDTH}px)`);
     const reduceMq = window.matchMedia("(prefers-reduced-motion: reduce)");
 
     const apply = () => {
-      const usePoster = mobileMq.matches || reduceMq.matches;
-      staticRef.current = usePoster;
-      setStaticPoster(usePoster);
-
-      if (usePoster) {
-        loadQueueRef.current = [];
-        cacheRef.current.clear();
-        inflightRef.current.clear();
-        shownRef.current = false;
-        setCanvasReady(false);
-        return;
-      }
-
-      framesRef.current = totalFrames;
-      ensureWindow(currentFrameRef.current);
+      setStaticPoster(mobileMq.matches || reduceMq.matches);
     };
 
     apply();
@@ -202,86 +68,271 @@ export function CanvasFrameScrubber({
       mobileMq.removeEventListener("change", apply);
       reduceMq.removeEventListener("change", apply);
     };
-    // Helpers close over the latest totalFrames/folder via refs.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [totalFrames, folderPath]);
+  }, []);
 
-  // Keep canvas resolution in sync with the container, cap DPR to limit fill-rate.
   useEffect(() => {
+    if (staticPoster) {
+      setCanvasReady(false);
+      return;
+    }
+
     const canvas = canvasRef.current;
     const container = containerRef.current;
     if (!canvas || !container) return;
 
-    const handleResize = () => {
-      const rect = container.getBoundingClientRect();
-      const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
-      canvas.width = Math.max(1, Math.round(rect.width * dpr));
-      canvas.height = Math.max(1, Math.round(rect.height * dpr));
-      if (!staticRef.current) drawFrame(currentFrameRef.current);
-    };
+    const ctx = canvas.getContext("2d", { alpha: false, desynchronized: true });
+    if (!ctx) return;
 
-    handleResize();
-    const observer = new ResizeObserver(handleResize);
-    observer.observe(container);
-    return () => observer.disconnect();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [staticPoster]);
+    const strong = new Map<number, ImageBitmap | HTMLImageElement>();
+    const weak = new Map<number, WeakRef<ImageBitmap | HTMLImageElement>>();
+    const inflight = new Set<number>();
 
-  // Smooth RAF lerp — only draws when the frame actually moves.
-  useEffect(() => {
-    if (staticPoster) {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      rafRef.current = null;
-      return;
-    }
+    let target = midIndex;
+    let current = midIndex;
+    let lastDrawn = -1;
+    let lastDrawTime = 0;
+    let pendingX: number | null = null;
+    let viewportW = window.innerWidth || 1;
+    let rafId: number | null = null;
+    let running = false;
+    let cancelled = false;
+    let shown = false;
 
-    let active = true;
-    const render = () => {
-      if (!active) return;
-      const diff = targetFrameRef.current - currentFrameRef.current;
-      if (Math.abs(diff) > 0.02) {
-        currentFrameRef.current += diff * 0.15;
-        ensureWindow(currentFrameRef.current);
-        drawFrame(currentFrameRef.current);
+    const urlFor = (index: number) =>
+      frameUrl(folderPath, sourceFrameNumber(index, totalFrames));
+
+    const revive = (index: number) => {
+      const ref = weak.get(index);
+      const value = ref?.deref();
+      if (value) {
+        strong.set(index, value);
+        weak.delete(index);
+        return value;
       }
-      rafRef.current = requestAnimationFrame(render);
+      weak.delete(index);
+      return null;
     };
 
-    rafRef.current = requestAnimationFrame(render);
+    const getFrame = (index: number) => strong.get(index) ?? revive(index);
+
+    const releaseHard = (frame: ImageBitmap | HTMLImageElement) => {
+      if (typeof ImageBitmap !== "undefined" && frame instanceof ImageBitmap) {
+        frame.close();
+        return;
+      }
+      if (frame instanceof HTMLImageElement) {
+        frame.onload = null;
+        frame.onerror = null;
+        frame.src = "";
+      }
+    };
+
+    const prune = (center: number) => {
+      for (const [index, frame] of strong) {
+        if (Math.abs(index - center) > WINDOW_RADIUS) {
+          weak.set(index, new WeakRef(frame));
+          strong.delete(index);
+        }
+      }
+      for (const [index, ref] of weak) {
+        if (Math.abs(index - center) <= HARD_EVICT_RADIUS) continue;
+        const frame = ref.deref();
+        if (frame) releaseHard(frame);
+        weak.delete(index);
+      }
+    };
+
+    const drawIndex = (index: number) => {
+      const frame = getFrame(index) ?? (() => {
+        const count = totalFrames;
+        for (let d = 1; d < count; d++) {
+          const a = getFrame(index + d);
+          if (a) return a;
+          const b = getFrame(index - d);
+          if (b) return b;
+        }
+        return null;
+      })();
+
+      if (!frame) return;
+      if ("naturalWidth" in frame && frame.naturalWidth === 0) return;
+
+      const cw = canvas.width;
+      const ch = canvas.height;
+      const iw = "naturalWidth" in frame ? frame.naturalWidth : frame.width;
+      const ih = "naturalHeight" in frame ? frame.naturalHeight : frame.height;
+      if (!iw || !ih) return;
+
+      const scale = Math.max(cw / iw, ch / ih);
+      const nw = iw * scale;
+      const nh = ih * scale;
+      ctx.drawImage(frame, (cw - nw) / 2, (ch - nh) / 2, nw, nh);
+      lastDrawn = index;
+
+      if (!shown) {
+        shown = true;
+        setCanvasReady(true);
+      }
+    };
+
+    const loadIndex = (index: number) => {
+      if (index < 0 || index >= totalFrames) return;
+      if (getFrame(index) || inflight.has(index)) return;
+
+      inflight.add(index);
+      const img = new Image();
+      img.decoding = "async";
+      img.src = urlFor(index);
+
+      const finish = async () => {
+        inflight.delete(index);
+        if (cancelled) {
+          img.src = "";
+          return;
+        }
+        if (Math.abs(index - Math.round(current)) > HARD_EVICT_RADIUS) {
+          img.src = "";
+          return;
+        }
+
+        let frame: ImageBitmap | HTMLImageElement = img;
+        if (typeof createImageBitmap === "function") {
+          try {
+            frame = await createImageBitmap(img);
+            img.src = "";
+          } catch {
+            frame = img;
+          }
+        }
+
+        if (cancelled) {
+          releaseHard(frame);
+          return;
+        }
+
+        strong.set(index, frame);
+        const nearest = clamp(Math.round(current), 0, totalFrames - 1);
+        if (index === nearest) drawIndex(index);
+      };
+
+      img.onload = () => {
+        void finish();
+      };
+      img.onerror = () => {
+        inflight.delete(index);
+      };
+    };
+
+    const ensureWindow = (center: number) => {
+      const c = clamp(center, 0, totalFrames - 1);
+      const start = Math.max(0, c - WINDOW_RADIUS);
+      const end = Math.min(totalFrames - 1, c + WINDOW_RADIUS);
+      for (let i = start; i <= end; i++) loadIndex(i);
+      prune(c);
+    };
+
+    const loop = (now: number) => {
+      if (cancelled) return;
+
+      if (pendingX != null) {
+        const progress = clamp(pendingX / viewportW, 0, 1);
+        target = progress * (totalFrames - 1);
+        pendingX = null;
+      }
+
+      const diff = target - current;
+      const moving = Math.abs(diff) > 0.02;
+      const due = now - lastDrawTime >= MIN_FRAME_MS;
+
+      if (due && moving) {
+        current += diff * LERP;
+        const idx = clamp(Math.round(current), 0, totalFrames - 1);
+        ensureWindow(idx);
+        if (idx !== lastDrawn) drawIndex(idx);
+        lastDrawTime = now;
+      }
+
+      if (Math.abs(target - current) > 0.02 || pendingX != null) {
+        rafId = requestAnimationFrame(loop);
+      } else {
+        running = false;
+        rafId = null;
+      }
+    };
+
+    const kick = () => {
+      if (running || cancelled) return;
+      running = true;
+      rafId = requestAnimationFrame(loop);
+    };
+
+    const onPointerX = (x: number) => {
+      pendingX = x;
+      kick();
+    };
+
+    const onMouseMove = (e: MouseEvent) => onPointerX(e.clientX);
+    const onTouchMove = (e: TouchEvent) => {
+      if (e.touches.length > 0) onPointerX(e.touches[0].clientX);
+    };
+
+    const resize = () => {
+      viewportW = window.innerWidth || 1;
+      const rect = container.getBoundingClientRect();
+      const cssW = Math.max(1, rect.width);
+      const cssH = Math.max(1, rect.height);
+      const drawW = Math.min(cssW, MAX_CANVAS_CSS_WIDTH);
+      const drawH = drawW * (cssH / cssW);
+      const dpr = Math.min(window.devicePixelRatio || 1, MAX_DPR);
+      const nextW = Math.max(1, Math.round(drawW * dpr));
+      const nextH = Math.max(1, Math.round(drawH * dpr));
+      if (canvas.width !== nextW || canvas.height !== nextH) {
+        canvas.width = nextW;
+        canvas.height = nextH;
+        if (lastDrawn >= 0) drawIndex(lastDrawn);
+      }
+    };
+
+    resize();
+    ensureWindow(Math.round(current));
+
+    const ro = new ResizeObserver(() => {
+      if (rafId == null && !running) {
+        requestAnimationFrame(resize);
+      } else {
+        resize();
+      }
+    });
+    ro.observe(container);
+
+    window.addEventListener("mousemove", onMouseMove, { passive: true });
+    window.addEventListener("touchmove", onTouchMove, { passive: true });
+    window.addEventListener("resize", resize, { passive: true });
+
     return () => {
-      active = false;
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      cancelled = true;
+      running = false;
+      if (rafId != null) cancelAnimationFrame(rafId);
+      ro.disconnect();
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("touchmove", onTouchMove);
+      window.removeEventListener("resize", resize);
+      for (const frame of strong.values()) releaseHard(frame);
+      for (const ref of weak.values()) {
+        const frame = ref.deref();
+        if (frame) releaseHard(frame);
+      }
+      strong.clear();
+      weak.clear();
+      inflight.clear();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [staticPoster]);
-
-  // Mouse / touch scrub across the viewport.
-  useEffect(() => {
-    if (staticPoster) return;
-
-    const setFromX = (clientX: number) => {
-      const w = window.innerWidth || 1;
-      const progress = Math.max(0, Math.min(1, clientX / w));
-      targetFrameRef.current = progress * (framesRef.current - 1);
-      ensureWindow(targetFrameRef.current);
-    };
-
-    const onMouse = (e: MouseEvent) => setFromX(e.clientX);
-    const onTouch = (e: TouchEvent) => {
-      if (e.touches.length > 0) setFromX(e.touches[0].clientX);
-    };
-
-    window.addEventListener("mousemove", onMouse, { passive: true });
-    window.addEventListener("touchmove", onTouch, { passive: true });
-    return () => {
-      window.removeEventListener("mousemove", onMouse);
-      window.removeEventListener("touchmove", onTouch);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [staticPoster]);
+  }, [staticPoster, totalFrames, folderPath, midIndex]);
 
   return (
-    <div ref={containerRef} className={`relative overflow-hidden ${className}`}>
+    <div
+      ref={containerRef}
+      className={`pointer-events-none relative overflow-hidden ${className}`}
+    >
       <img
         src={posterSrc}
         alt=""
@@ -299,7 +350,7 @@ export function CanvasFrameScrubber({
           ref={canvasRef}
           className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-500 ${
             canvasReady ? "opacity-100" : "opacity-0"
-          } ${blurAmount}`}
+          }`}
         />
       )}
 
