@@ -33,7 +33,7 @@ export function Hero() {
       {/* Interactive frame scrubber — original light global tint */}
       <motion.div style={{ opacity: sceneOpacity }} className="absolute inset-0 w-full h-full z-[1]">
         <CanvasFrameScrubber
-          totalFrames={192}
+          totalFrames={48}
           folderPath="/videos/frames"
           className="h-full w-full"
           overlayOpacity={0.35}
