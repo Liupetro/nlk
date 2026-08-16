@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start -H 0.0.0.0 -p 3000",
     "lint": "eslint",
-    "postinstall": "next build && npm prune --omit=dev"
+    "postinstall": "next build"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.7",
