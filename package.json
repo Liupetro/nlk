@@ -5,8 +5,9 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "node amvera-start.cjs",
-    "lint": "eslint"
+    "start": "next start -H 0.0.0.0 -p 3000",
+    "lint": "eslint",
+    "postinstall": "next build"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.7",
