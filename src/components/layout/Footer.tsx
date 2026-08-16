@@ -5,7 +5,6 @@ import { useT } from "@/components/providers/LanguageProvider";
 import { BrandLogo } from "@/components/ui/BrandLogo";
 import { Container } from "@/components/ui/Container";
 import { LanguageSwitcher } from "@/components/ui/LanguageSwitcher";
-import { MaxIcon } from "@/components/ui/MaxIcon";
 
 export function Footer() {
   const t = useT();
@@ -23,17 +22,6 @@ export function Footer() {
             <p className="mt-5 text-sm leading-relaxed text-white/50 max-w-sm">
               {t.footer.blurb}
             </p>
-            <a
-              href={t.contact.maxUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-5 inline-flex items-center gap-2.5 text-sm font-medium tracking-tight text-white/65 hover:text-accent-bright transition-colors"
-            >
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-accent-bright">
-                <MaxIcon className="h-[1.3rem] w-[1.3rem]" />
-              </span>
-              <span>{t.contact.contactLabels.max}</span>
-            </a>
           </div>
 
           {t.footer.columns.map((col) => (

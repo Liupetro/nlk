@@ -28,7 +28,7 @@ export type SiteContent = {
     closeMenu: string;
     /** Display phone in header */
     phone: string;
-    /** tel: href, e.g. +78007006852 */
+    /** tel: href, e.g. +78001002052 */
     phoneTel: string;
   };
   hero: {
@@ -225,8 +225,6 @@ export type SiteContent = {
     phone: string;
     /** tel: href for click-to-call */
     phoneTel: string;
-    /** MAX messenger profile (opens app on mobile, web on desktop) */
-    maxUrl: string;
     address: string;
     hours: string;
     labels: {
@@ -264,7 +262,6 @@ export type SiteContent = {
       email: string;
       phone: string;
       hq: string;
-      max: string;
     };
   };
   footer: {
@@ -308,8 +305,8 @@ const en: SiteContent = {
     quoteCta: "Get a quote",
     openMenu: "Open menu",
     closeMenu: "Close menu",
-    phone: "8 800 700-68-52",
-    phoneTel: "+78007006852",
+    phone: "8 800 100-20-52",
+    phoneTel: "+78001002052",
   },
   hero: {
     eyebrow: "High-pressure die casting in Russia",
@@ -884,10 +881,8 @@ const en: SiteContent = {
     subheadline:
       "Send a drawing or 3D model — we will calculate tooling and part cost, propose the optimal technology, and confirm lead times.",
     email: "zakaz@aldetali.com",
-    phone: "8 800 700-68-52",
-    phoneTel: "+78007006852",
-    maxUrl:
-      "https://max.ru/u/f9LHodD0cOL5K7KWtnr6TvN3-NQfnuS0Mxzo3PtxwNhkL9I5X-bZ8r_xoeA",
+    phone: "8 800 100-20-52",
+    phoneTel: "+78001002052",
     address: "6th Line of Vasilyevsky Island, 57, St. Petersburg",
     hours: "Mon–Fri, 9:00–18:00",
     labels: {
@@ -941,7 +936,6 @@ const en: SiteContent = {
       email: "Email",
       phone: "Phone",
       hq: "Address",
-      max: "MAX",
     },
   },
   footer: {
@@ -1001,8 +995,8 @@ const ru: SiteContent = {
     quoteCta: "Получить расчёт",
     openMenu: "Открыть меню",
     closeMenu: "Закрыть меню",
-    phone: "8 800 700-68-52",
-    phoneTel: "+78007006852",
+    phone: "8 800 100-20-52",
+    phoneTel: "+78001002052",
   },
   hero: {
     eyebrow: "Литьё под давлением в России",
@@ -1577,10 +1571,8 @@ const ru: SiteContent = {
     subheadline:
       "Пришлите чертёж или 3D-модель — мы рассчитаем стоимость оснастки и детали, предложим оптимальную технологию и сроки.",
     email: "zakaz@aldetali.com",
-    phone: "8 800 700-68-52",
-    phoneTel: "+78007006852",
-    maxUrl:
-      "https://max.ru/u/f9LHodD0cOL5K7KWtnr6TvN3-NQfnuS0Mxzo3PtxwNhkL9I5X-bZ8r_xoeA",
+    phone: "8 800 100-20-52",
+    phoneTel: "+78001002052",
     address: "6-я линия Васильевского острова, 57, Санкт-Петербург",
     hours: "Пн–Пт, 9:00–18:00",
     labels: {
@@ -1634,7 +1626,6 @@ const ru: SiteContent = {
       email: "E-mail",
       phone: "Телефон",
       hq: "Адрес",
-      max: "MAX",
     },
   },
   footer: {

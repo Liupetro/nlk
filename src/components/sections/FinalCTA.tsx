@@ -16,7 +16,6 @@ import { useT } from "@/components/providers/LanguageProvider";
 import { Container } from "@/components/ui/Container";
 import { Button } from "@/components/ui/Button";
 import { MaterialSelect } from "@/components/ui/MaterialSelect";
-import { MaxIcon } from "@/components/ui/MaxIcon";
 import { Reveal } from "@/components/ui/Reveal";
 
 type Props = {
@@ -161,15 +160,6 @@ export function FinalCTA({ showHeading = true }: Props) {
                 label={contact.contactLabels.phone}
                 value={contact.phone}
                 href={`tel:${contact.phoneTel}`}
-              />
-              <ContactLine
-                icon={MaxIcon}
-                label={contact.contactLabels.max}
-                value={contact.contactLabels.max}
-                href={contact.maxUrl}
-                external
-                hideLabel
-                iconClassName="h-[1.3rem] w-[1.3rem]"
               />
               <ContactLine
                 icon={MapPin}
