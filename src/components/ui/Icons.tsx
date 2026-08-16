@@ -1,0 +1,68 @@
+import {
+  Award,
+  Boxes,
+  CalendarCheck,
+  CheckCircle2,
+  Clock,
+  Cog,
+  Crosshair,
+  Cuboid,
+  Factory,
+  Gauge,
+  Layers,
+  Leaf,
+  Link2,
+  Microscope,
+  Paintbrush,
+  Ruler,
+  Settings2,
+  ShieldCheck,
+  Sparkles,
+  Wrench,
+  Zap,
+  type LucideIcon,
+} from "lucide-react";
+
+export const capabilityIcons: Record<string, LucideIcon> = {
+  aluminum: Factory,
+  tooling: Wrench,
+  cnc: Settings2,
+  finishing: Paintbrush,
+  quality: ShieldCheck,
+  scale: Boxes,
+  engineering: Ruler,
+};
+
+/** WhyChooseUs — order matches benefits[]: quote, alloys, QC, trial setup, machining, tooling repair */
+export const benefitIcons: LucideIcon[] = [
+  Clock,
+  Layers,
+  ShieldCheck,
+  Settings2,
+  Cog,
+  Wrench,
+];
+
+export {
+  Award,
+  Boxes,
+  CalendarCheck,
+  CheckCircle2,
+  Clock,
+  Cog,
+  Crosshair,
+  Cuboid,
+  Factory,
+  Gauge,
+  Layers,
+  Leaf,
+  Link2,
+  Microscope,
+  Paintbrush,
+  Ruler,
+  Settings2,
+  ShieldCheck,
+  Sparkles,
+  Wrench,
+  Zap,
+};
