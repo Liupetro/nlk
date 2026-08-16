@@ -7,5 +7,5 @@ build:
   additionalCommands: |
     npm install
 run:
-  command: npx next build && npx next start -H 0.0.0.0 -p 3000
+  command: node amvera-start.cjs
   containerPort: 3000
