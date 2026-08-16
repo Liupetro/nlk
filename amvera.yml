@@ -1,14 +1,12 @@
-meta:
+﻿meta:
   environment: node
   toolchain:
     name: npm
     version: "20"
-
 build:
   additionalCommands: |
     npm install
     npm run build
-
 run:
-  command: npm start
+  command: npx next start -H 0.0.0.0 -p 3000
   containerPort: 3000
