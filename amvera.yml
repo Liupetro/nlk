@@ -6,7 +6,6 @@
 build:
   additionalCommands: |
     npm install
-    npm run build
 run:
-  command: npx next start -H 0.0.0.0 -p 3000
+  command: npx next build && npx next start -H 0.0.0.0 -p 3000
   containerPort: 3000
