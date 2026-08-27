@@ -16,6 +16,7 @@ export type TimelineStep = {
   tags?: string[];
   image: string;
   imageAlt: string;
+  imageCaptions?: { left: string; right: string };
 };
 
 type Props = {
@@ -85,7 +86,7 @@ export function StepTimeline({
 
               return (
                 <Reveal key={step.number + step.title} delay={i * 0.06} as="li">
-                  <div className="relative grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-14 items-center">
+                  <div className="relative grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-14 items-center min-w-0">
                     <div className="absolute left-0 sm:left-2 lg:left-1/2 lg:-translate-x-1/2 top-0 z-10 flex h-14 w-14 items-center justify-center">
                       <motion.span
                         initial={reduceMotion ? false : { scale: 0.75, opacity: 0 }}
@@ -103,7 +104,7 @@ export function StepTimeline({
 
                     <div
                       className={cn(
-                        "pl-16 sm:pl-20 lg:pl-0",
+                        "min-w-0 pl-16 sm:pl-20 lg:pl-0",
                         imageOnRight
                           ? "lg:pr-12 lg:col-start-1 lg:row-start-1 lg:text-right"
                           : "lg:pl-12 lg:col-start-2 lg:row-start-1",
@@ -158,7 +159,7 @@ export function StepTimeline({
 
                     <div
                       className={cn(
-                        "pl-16 sm:pl-20 lg:pl-0",
+                        "min-w-0 pl-16 sm:pl-20 lg:pl-0",
                         imageOnRight
                           ? "lg:pl-12 lg:col-start-2 lg:row-start-1"
                           : "lg:pr-12 lg:col-start-1 lg:row-start-1",
@@ -183,11 +184,31 @@ export function StepTimeline({
                           className="pointer-events-none absolute inset-0 bg-gradient-to-t from-charcoal/35 via-transparent to-transparent"
                           aria-hidden
                         />
-                        <div className="absolute bottom-3 left-3 right-3 flex justify-between items-end gap-2">
-                          <span className="rounded-lg bg-charcoal/70 backdrop-blur-sm px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-white/85">
-                            {step.number}
-                          </span>
-                        </div>
+                        {step.imageCaptions ? (
+                          <>
+                            <span className="absolute top-3 left-3 rounded-lg bg-charcoal/70 backdrop-blur-sm px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-white/85">
+                              {step.number}
+                            </span>
+                            <div className="absolute bottom-3 left-3 right-3 grid grid-cols-2 gap-2">
+                              <div className="flex min-w-0 justify-center">
+                                <span className="max-w-full rounded-lg bg-charcoal/70 backdrop-blur-sm px-2 py-1 text-[9px] sm:text-[10px] font-semibold uppercase tracking-wide sm:tracking-wider text-white/85 leading-tight text-center">
+                                  {step.imageCaptions.left}
+                                </span>
+                              </div>
+                              <div className="flex min-w-0 justify-center">
+                                <span className="max-w-full rounded-lg bg-charcoal/70 backdrop-blur-sm px-2 py-1 text-[9px] sm:text-[10px] font-semibold uppercase tracking-wide sm:tracking-wider text-white/85 leading-tight text-center">
+                                  {step.imageCaptions.right}
+                                </span>
+                              </div>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="absolute bottom-3 left-3 right-3 flex justify-between items-end">
+                            <span className="rounded-lg bg-charcoal/70 backdrop-blur-sm px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-white/85">
+                              {step.number}
+                            </span>
+                          </div>
+                        )}
                       </motion.div>
                     </div>
                   </div>

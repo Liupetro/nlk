@@ -6,7 +6,7 @@ import { HomeCTA } from "@/components/sections/HomeCTA";
 
 export const metadata: Metadata = {
   title: "Преимущества",
-  description: `Почему выбирают ${brand.name}: расчёт за день, сплавы, ОТК, пробные партии, механообработка и оснастка.`,
+  description: `Почему выбирают ${brand.name}: расчёт за день, сплавы, контроль пористости, пробные образцы, механообработка и оснастка.`,
 };
 
 export default function AdvantagesPage() {

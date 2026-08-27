@@ -21,6 +21,7 @@ export function WhyChooseUs({ showHeading = true }: Props) {
     description: b.description,
     image: b.image,
     imageAlt: b.imageAlt,
+    imageCaptions: b.imageCaptions,
   }));
 
   return (

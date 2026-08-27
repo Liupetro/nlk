@@ -138,6 +138,8 @@ export type SiteContent = {
       description: string;
       image: string;
       imageAlt: string;
+      /** Optional left/right labels overlaid on a comparison photo */
+      imageCaptions?: { left: string; right: string };
     }[];
   };
   estimator: {
@@ -624,14 +626,16 @@ const en: SiteContent = {
         imageAlt: "Stack of aluminum casting ingots — cold industrial metal pack",
       },
       {
-        title: "In-house QC (OTK)",
+        title: "Porosity in parts — to a minimum",
         description:
-          "Quality control before series launch and after batch release: visual inspection, control measurements, and porosity checks.",
-        image: "/advantages/adv-03-qc.jpg",
-        imageAlt: "Quality control: measuring aluminum die-cast parts with precision instruments",
+          "We reduce gas porosity in aluminum castings to a minimum through melt degassing, process setup, and inspection of trial parts before series.",
+        image: "/advantages/adv-03-porosity.jpg",
+        imageAlt:
+          "Comparison: aluminum casting section with gas porosity versus the same part with a dense structure",
+        imageCaptions: { left: "porosity", right: "dense structure" },
       },
       {
-        title: "Individual trial sample setup",
+        title: "Trial sample setup",
         description:
           "Before series, we fine-tune the casting process and inspect trial parts. Production starts only after quality confirmation.",
         image: "/advantages/adv-04-trial.jpg",
@@ -1314,14 +1318,16 @@ const ru: SiteContent = {
         imageAlt: "Штабель алюминиевых чушек — холодный индустриальный металл",
       },
       {
-        title: "Свой ОТК",
+        title: "Пористость в деталях — к минимуму",
         description:
-          "Контроль качества до запуска серии и после выпуска партии: визуальный осмотр, контрольные замеры и проверка на пористость.",
-        image: "/advantages/adv-03-qc.jpg",
-        imageAlt: "ОТК: контрольные замеры алюминиевых деталей после литья под давлением",
+          "Сводим газовую пористость в алюминиевых отливках к минимуму за счёт дегазации расплава, наладки режима и проверки пробных деталей до серии.",
+        image: "/advantages/adv-03-porosity.jpg",
+        imageAlt:
+          "Сравнение: разрез алюминиевой отливки с газовой пористостью и та же деталь с плотной структурой",
+        imageCaptions: { left: "пористость", right: "плотная структура" },
       },
       {
-        title: "Индивидуальная наладка пробных образцов",
+        title: "Наладка пробных образцов",
         description:
           "Перед серией доводим режим литья и проверяем пробные детали. Производство запускаем только после подтверждения качества.",
         image: "/advantages/adv-04-trial.jpg",
