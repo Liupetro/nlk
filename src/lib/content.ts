@@ -28,7 +28,7 @@ export type SiteContent = {
     closeMenu: string;
     /** Display phone in header */
     phone: string;
-    /** tel: href, e.g. +78001002052 */
+    /** tel: href, e.g. +78007772810 */
     phoneTel: string;
   };
   hero: {
@@ -307,8 +307,8 @@ const en: SiteContent = {
     quoteCta: "Get a quote",
     openMenu: "Open menu",
     closeMenu: "Close menu",
-    phone: "8 800 100-20-52",
-    phoneTel: "+78001002052",
+    phone: "8 800 777 28 10",
+    phoneTel: "+78007772810",
   },
   hero: {
     eyebrow: "High-pressure die casting in Russia",
@@ -884,9 +884,9 @@ const en: SiteContent = {
     headline: "Ready to discuss your project?",
     subheadline:
       "Send a drawing or 3D model — we will calculate tooling and part cost, propose the optimal technology, and confirm lead times.",
-    email: "zakaz@aldetali.com",
-    phone: "8 800 100-20-52",
-    phoneTel: "+78001002052",
+    email: "zakaz@aldetali.ru",
+    phone: "8 800 777 28 10",
+    phoneTel: "+78007772810",
     address: "6th Line of Vasilyevsky Island, 57, St. Petersburg",
     hours: "Mon–Fri, 9:00–18:00",
     labels: {
@@ -999,8 +999,8 @@ const ru: SiteContent = {
     quoteCta: "Получить расчёт",
     openMenu: "Открыть меню",
     closeMenu: "Закрыть меню",
-    phone: "8 800 100-20-52",
-    phoneTel: "+78001002052",
+    phone: "8 800 777 28 10",
+    phoneTel: "+78007772810",
   },
   hero: {
     eyebrow: "Литьё под давлением в России",
@@ -1576,9 +1576,9 @@ const ru: SiteContent = {
     headline: "Готовы обсудить ваш проект?",
     subheadline:
       "Пришлите чертёж или 3D-модель — мы рассчитаем стоимость оснастки и детали, предложим оптимальную технологию и сроки.",
-    email: "zakaz@aldetali.com",
-    phone: "8 800 100-20-52",
-    phoneTel: "+78001002052",
+    email: "zakaz@aldetali.ru",
+    phone: "8 800 777 28 10",
+    phoneTel: "+78007772810",
     address: "6-я линия Васильевского острова, 57, Санкт-Петербург",
     hours: "Пн–Пт, 9:00–18:00",
     labels: {

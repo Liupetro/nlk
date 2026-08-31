@@ -109,7 +109,7 @@ const copy = {
         items: [
           "8.1. Оператор обеспечивает сохранность данных и исключает доступ неуполномоченных лиц.",
           "8.2. Данные не передаются третьим лицам без согласия субъекта, за исключением случаев, предусмотренных законом.",
-          "8.3. При неточностях Пользователь может направить уведомление на zakaz@aldetali.com с пометкой «Актуализация персональных данных».",
+          "8.3. При неточностях Пользователь может направить уведомление на zakaz@aldetali.ru с пометкой «Актуализация персональных данных».",
           "8.4. Срок обработки определяется достижением целей либо отзывом согласия.",
           "8.5. Информация сторонних сервисов (например, Яндекс.Метрика) хранится и обрабатывается ими в соответствии с их политиками.",
           "8.6. Оператор обеспечивает конфиденциальность данных.",
@@ -130,7 +130,7 @@ const copy = {
       {
         heading: "11. Заключительные положения",
         items: [
-          "11.1. По вопросам обработки персональных данных Пользователь может обратиться по адресу: zakaz@aldetali.com.",
+          "11.1. По вопросам обработки персональных данных Пользователь может обратиться по адресу: zakaz@aldetali.ru.",
           "11.2. Актуальная версия Политики доступна по адресу: https://www.aldetali.com/privacy.",
           "11.3. Политика действует бессрочно до замены новой версией.",
         ],
@@ -236,7 +236,7 @@ const copy = {
         items: [
           "8.1. The Operator safeguards data and prevents unauthorized access.",
           "8.2. Data is not transferred to third parties without consent, except as required by law.",
-          "8.3. To correct inaccuracies, the User may email zakaz@aldetali.com with the note “Personal data update”.",
+          "8.3. To correct inaccuracies, the User may email zakaz@aldetali.ru with the note “Personal data update”.",
           "8.4. Processing continues until the purposes are achieved or consent is withdrawn.",
           "8.5. Third-party services (e.g. Yandex.Metrika) process data under their own policies.",
           "8.6. The Operator ensures confidentiality of personal data.",
@@ -257,7 +257,7 @@ const copy = {
       {
         heading: "11. Final provisions",
         items: [
-          "11.1. Questions about personal data processing: zakaz@aldetali.com.",
+          "11.1. Questions about personal data processing: zakaz@aldetali.ru.",
           "11.2. The current version of this Policy is available at https://www.aldetali.com/privacy.",
           "11.3. This Policy remains in force indefinitely until replaced by a new version.",
         ],

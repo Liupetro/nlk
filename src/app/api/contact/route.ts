@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-const TO_EMAIL = process.env.CONTACT_TO_EMAIL ?? "zakaz@aldetali.com";
+const TO_EMAIL = process.env.CONTACT_TO_EMAIL ?? "zakaz@aldetali.ru";
 const ALLOWED_EXT = new Set(["pdf", "stp", "step", "jpg", "jpeg", "png"]);
 const MAX_FILE_BYTES = 15 * 1024 * 1024; // 15 MB
 const MAX_FIELD = {
