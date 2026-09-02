@@ -17,6 +17,9 @@ const jetbrainsMono = JetBrains_Mono({
   display: "swap",
 });
 
+/** Host-based Metrika must not be baked into a year-long static HTML cache. */
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   metadataBase: new URL("https://www.aldetali.com"),
   title: {

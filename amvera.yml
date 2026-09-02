@@ -5,6 +5,7 @@
     version: "20"
 build:
   additionalCommands: |
+    rm -rf .next
     npm install
 run:
   command: node amvera-start.cjs
