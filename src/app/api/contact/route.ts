@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
+import https from "node:https";
+import dns from "node:dns";
+import { URL } from "node:url";
 
 export const runtime = "nodejs";
+
+dns.setDefaultResultOrder("ipv4first");
 
 const ALLOWED_EXT = new Set(["pdf", "stp", "step", "jpg", "jpeg", "png"]);
 const MAX_FILE_BYTES = 15 * 1024 * 1024; // 15 MB
@@ -96,8 +101,14 @@ function collectFiles(formData: FormData): File[] {
 }
 
 function bitrixWebhookBase(): string | null {
-  const raw = process.env.BITRIX_WEBHOOK_URL?.trim();
-  if (!raw) return null;
+  let raw = process.env.BITRIX_WEBHOOK_URL?.trim() ?? "";
+  if (
+    (raw.startsWith('"') && raw.endsWith('"')) ||
+    (raw.startsWith("'") && raw.endsWith("'"))
+  ) {
+    raw = raw.slice(1, -1).trim();
+  }
+  if (!raw.startsWith("https://")) return null;
   return raw.endsWith("/") ? raw : `${raw}/`;
 }
 
@@ -121,38 +132,80 @@ async function bitrixCall(
     return { ok: false, error: "Bitrix is not configured" };
   }
 
+  let url: URL;
   try {
-    const res = await fetch(`${base}${method}`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify(params),
-    });
-    const raw = await res.text();
-    let data: BitrixResponse | null = null;
-    try {
-      data = JSON.parse(raw) as BitrixResponse;
-    } catch {
-      console.error("[contact/bitrix]", method, res.status, redactBitrix(raw.slice(0, 300)));
-      return { ok: false, error: "Bitrix failed" };
-    }
-    if (!res.ok || data.error) {
-      console.error(
-        "[contact/bitrix]",
-        method,
-        data.error ?? res.status,
-        redactBitrix(data.error_description ?? ""),
-      );
-      return { ok: false, error: "Bitrix failed" };
-    }
-    return { ok: true, result: data.result };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    console.error("[contact/bitrix]", method, redactBitrix(message));
-    return { ok: false, error: "Bitrix failed" };
+    url = new URL(`${base}${method}`);
+  } catch {
+    console.error("[contact/bitrix] invalid webhook URL");
+    return { ok: false, error: "Bitrix is not configured" };
   }
+
+  const body = JSON.stringify(params);
+
+  return new Promise((resolve) => {
+    const req = https.request(
+      {
+        protocol: url.protocol,
+        hostname: url.hostname,
+        port: url.port || 443,
+        path: `${url.pathname}${url.search}`,
+        method: "POST",
+        family: 4,
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          "Content-Length": Buffer.byteLength(body),
+        },
+        timeout: 15000,
+      },
+      (res) => {
+        const chunks: Buffer[] = [];
+        res.on("data", (chunk: Buffer) => chunks.push(chunk));
+        res.on("error", (error) => {
+          console.error("[contact/bitrix]", method, error.message);
+          resolve({ ok: false, error: "Bitrix failed" });
+        });
+        res.on("end", () => {
+          const raw = Buffer.concat(chunks).toString("utf8");
+          let data: BitrixResponse | null = null;
+          try {
+            data = JSON.parse(raw) as BitrixResponse;
+          } catch {
+            console.error(
+              "[contact/bitrix]",
+              method,
+              res.statusCode,
+              redactBitrix(raw.slice(0, 300)),
+            );
+            resolve({ ok: false, error: "Bitrix failed" });
+            return;
+          }
+          if ((res.statusCode ?? 500) >= 400 || data.error) {
+            console.error(
+              "[contact/bitrix]",
+              method,
+              data.error ?? res.statusCode,
+              redactBitrix(data.error_description ?? ""),
+            );
+            resolve({ ok: false, error: "Bitrix failed" });
+            return;
+          }
+          resolve({ ok: true, result: data.result });
+        });
+      },
+    );
+    req.on("error", (error) => {
+      console.error("[contact/bitrix]", method, error.message);
+      resolve({ ok: false, error: "Bitrix failed" });
+    });
+    req.on("timeout", () => {
+      req.destroy();
+      console.error("[contact/bitrix]", method, "timeout");
+      resolve({ ok: false, error: "Bitrix failed" });
+    });
+    req.write(body);
+    req.end();
+  });
 }
 
 function buildComments(params: {
