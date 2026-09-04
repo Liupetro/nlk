@@ -1,11 +1,7 @@
+import { spawn } from "node:child_process";
 import { NextResponse } from "next/server";
-import https from "node:https";
-import dns from "node:dns";
-import { URL } from "node:url";
 
 export const runtime = "nodejs";
-
-dns.setDefaultResultOrder("ipv4first");
 
 const ALLOWED_EXT = new Set(["pdf", "stp", "step", "jpg", "jpeg", "png"]);
 const MAX_FILE_BYTES = 15 * 1024 * 1024; // 15 MB
@@ -74,24 +70,6 @@ function formatSubmittedAt(date = new Date()): string {
   return `${get("day")}.${get("month")}.${get("year")} ${get("hour")}:${get("minute")} (МСК)`;
 }
 
-function sourceUrl(request: Request): string {
-  const referer = request.headers.get("referer")?.trim();
-  if (referer) return referer;
-  const host = (
-    request.headers.get("x-forwarded-host") ??
-    request.headers.get("host") ??
-    "aldetali.ru"
-  )
-    .split(",")[0]
-    ?.trim();
-  const proto = (
-    request.headers.get("x-forwarded-proto") ?? "https"
-  )
-    .split(",")[0]
-    ?.trim();
-  return `${proto}://${host}`;
-}
-
 function collectFiles(formData: FormData): File[] {
   const files: File[] = [];
   for (const value of formData.getAll("file")) {
@@ -100,116 +78,12 @@ function collectFiles(formData: FormData): File[] {
   return files;
 }
 
-function bitrixWebhookBase(): string | null {
-  let raw = process.env.BITRIX_WEBHOOK_URL?.trim() ?? "";
-  if (
-    (raw.startsWith('"') && raw.endsWith('"')) ||
-    (raw.startsWith("'") && raw.endsWith("'"))
-  ) {
-    raw = raw.slice(1, -1).trim();
-  }
-  if (!raw.startsWith("https://")) return null;
-  return raw.endsWith("/") ? raw : `${raw}/`;
-}
-
-function redactBitrix(text: string): string {
-  return text.replace(/\/rest\/\d+\/[A-Za-z0-9]+/gi, "/rest/***/***");
-}
-
-type BitrixResponse = {
-  result?: unknown;
-  error?: string;
-  error_description?: string;
-};
-
-async function bitrixCall(
-  method: string,
-  params: Record<string, unknown>,
-): Promise<{ ok: true; result: unknown } | { ok: false; error: string }> {
-  const base = bitrixWebhookBase();
-  if (!base) {
-    console.error("[contact/bitrix] BITRIX_WEBHOOK_URL is not set");
-    return { ok: false, error: "Bitrix is not configured" };
-  }
-
-  let url: URL;
-  try {
-    url = new URL(`${base}${method}`);
-  } catch {
-    console.error("[contact/bitrix] invalid webhook URL");
-    return { ok: false, error: "Bitrix is not configured" };
-  }
-
-  const body = JSON.stringify(params);
-
-  return new Promise((resolve) => {
-    const req = https.request(
-      {
-        protocol: url.protocol,
-        hostname: url.hostname,
-        port: url.port || 443,
-        path: `${url.pathname}${url.search}`,
-        method: "POST",
-        family: 4,
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-          "Content-Length": Buffer.byteLength(body),
-        },
-        timeout: 15000,
-      },
-      (res) => {
-        const chunks: Buffer[] = [];
-        res.on("data", (chunk: Buffer) => chunks.push(chunk));
-        res.on("error", (error) => {
-          console.error("[contact/bitrix]", method, error.message);
-          resolve({ ok: false, error: "Bitrix failed" });
-        });
-        res.on("end", () => {
-          const raw = Buffer.concat(chunks).toString("utf8");
-          let data: BitrixResponse | null = null;
-          try {
-            data = JSON.parse(raw) as BitrixResponse;
-          } catch {
-            console.error(
-              "[contact/bitrix]",
-              method,
-              res.statusCode,
-              redactBitrix(raw.slice(0, 300)),
-            );
-            resolve({ ok: false, error: "Bitrix failed" });
-            return;
-          }
-          if ((res.statusCode ?? 500) >= 400 || data.error) {
-            console.error(
-              "[contact/bitrix]",
-              method,
-              data.error ?? res.statusCode,
-              redactBitrix(data.error_description ?? ""),
-            );
-            resolve({ ok: false, error: "Bitrix failed" });
-            return;
-          }
-          resolve({ ok: true, result: data.result });
-        });
-      },
-    );
-    req.on("error", (error) => {
-      console.error("[contact/bitrix]", method, error.message);
-      resolve({ ok: false, error: "Bitrix failed" });
-    });
-    req.on("timeout", () => {
-      req.destroy();
-      console.error("[contact/bitrix]", method, "timeout");
-      resolve({ ok: false, error: "Bitrix failed" });
-    });
-    req.write(body);
-    req.end();
-  });
-}
-
-function buildComments(params: {
+function buildBodyText(params: {
   source: string;
+  name: string;
+  company: string;
+  phone: string;
+  email: string;
   materialLabel: string;
   volumeLabel: string;
   scopeLabel: string;
@@ -217,20 +91,22 @@ function buildComments(params: {
   clientIp: string;
   userAgent: string;
   submittedAt: string;
-  pageUrl: string;
   fileNames: string[];
 }): string {
   const lines = [
     `Источник: ${params.source === "estimator" ? "Заявка на расчёт (/process)" : "Контакты (/contact)"}`,
-    `URL: ${params.pageUrl}`,
     "",
+    `Имя: ${params.name}`,
+    `Компания: ${params.company}`,
+    `Телефон: ${params.phone || "—"}`,
+    `Email: ${params.email}`,
     `Материал: ${params.materialLabel || "—"}`,
   ];
   if (params.volumeLabel) lines.push(`Годовой объём: ${params.volumeLabel}`);
   if (params.scopeLabel) lines.push(`Что нужно: ${params.scopeLabel}`);
-  lines.push("", "Текст заявки:", params.message, "");
+  lines.push("", "Комментарий:", params.message, "");
   if (params.fileNames.length) {
-    lines.push("Файлы:", ...params.fileNames.map((name) => `— ${name}`), "");
+    lines.push("Файлы (имена, без вложений):", ...params.fileNames.map((name) => `— ${name}`), "");
   }
   lines.push(
     "Технические данные",
@@ -241,52 +117,133 @@ function buildComments(params: {
   return lines.join("\n");
 }
 
-async function fileToBase64(file: File): Promise<[string, string]> {
-  const buffer = Buffer.from(await file.arrayBuffer());
-  return [file.name, buffer.toString("base64")];
+const RESEND_CHILD_SCRIPT = `
+const https = require("https");
+const key = process.env.RESEND_API_KEY || "";
+const to = process.env.CONTACT_TO_EMAIL || "";
+const from = process.env.CONTACT_FROM_EMAIL || "";
+let payload;
+try {
+  payload = JSON.parse(process.env.CONTACT_MAIL_PAYLOAD || "{}");
+} catch (e) {
+  process.stdout.write(JSON.stringify({ ok: false, error: "bad payload" }));
+  process.exit(2);
 }
+if (!key || !to || !from || !payload.subject || !payload.text) {
+  process.stdout.write(JSON.stringify({ ok: false, error: "missing env" }));
+  process.exit(2);
+}
+const body = JSON.stringify({
+  from: from,
+  to: [to],
+  reply_to: payload.replyTo || undefined,
+  subject: payload.subject,
+  text: payload.text
+});
+const req = https.request({
+  hostname: "api.resend.com",
+  path: "/emails",
+  method: "POST",
+  family: 4,
+  headers: {
+    Authorization: "Bearer " + key,
+    "Content-Type": "application/json",
+    "Content-Length": Buffer.byteLength(body)
+  },
+  timeout: 15000
+}, (res) => {
+  let data = "";
+  res.on("data", (chunk) => { data += chunk; });
+  res.on("end", () => {
+    const ok = res.statusCode >= 200 && res.statusCode < 300;
+    process.stdout.write(JSON.stringify({ ok: ok }));
+    process.exit(ok ? 0 : 2);
+  });
+});
+req.on("error", () => {
+  process.stdout.write(JSON.stringify({ ok: false }));
+  process.exit(2);
+});
+req.on("timeout", () => {
+  req.destroy();
+  process.stdout.write(JSON.stringify({ ok: false }));
+  process.exit(2);
+});
+req.write(body);
+req.end();
+`;
 
-async function attachFilesToLead(leadId: number, files: File[]): Promise<boolean> {
-  const storageList = await bitrixCall("disk.storage.getlist", {});
-  let storageId: number | null = null;
-  if (storageList.ok && Array.isArray(storageList.result) && storageList.result.length > 0) {
-    const storages = storageList.result as { ID?: string | number }[];
-    const parsed = Number(storages[0]?.ID);
-    if (Number.isFinite(parsed) && parsed > 0) storageId = parsed;
-  } else {
-    console.error("[contact/bitrix] disk.storage.getlist failed");
+function sendViaResendChild(payload: {
+  replyTo: string;
+  subject: string;
+  text: string;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const key = process.env.RESEND_API_KEY?.trim() || "";
+  const to = process.env.CONTACT_TO_EMAIL?.trim() || "";
+  const from = process.env.CONTACT_FROM_EMAIL?.trim() || "";
+  if (!key || !to || !from) {
+    console.error("[contact/resend] missing RESEND_API_KEY or CONTACT_* email env");
+    return Promise.resolve({ ok: false, error: "Mail is not configured" });
   }
 
-  for (const file of files) {
-    const [filename, content] = await fileToBase64(file);
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (result: { ok: true } | { ok: false; error: string }) => {
+      if (settled) return;
+      settled = true;
+      resolve(result);
+    };
 
-    if (storageId) {
-      const uploaded = await bitrixCall("disk.storage.uploadfile", {
-        id: storageId,
-        data: { NAME: filename },
-        fileContent: [filename, content],
-        generateUniqueName: true,
+    let child;
+    try {
+      child = spawn(process.execPath, ["-e", RESEND_CHILD_SCRIPT], {
+        env: {
+          ...process.env,
+          CONTACT_MAIL_PAYLOAD: JSON.stringify(payload),
+        },
+        stdio: ["ignore", "pipe", "pipe"],
+        windowsHide: true,
       });
-      if (!uploaded.ok) {
-        console.error("[contact/bitrix] disk.storage.uploadfile failed", filename);
-      }
+    } catch (error) {
+      console.error("[contact/resend] spawn failed");
+      finish({ ok: false, error: "Send failed" });
+      return;
     }
 
-    const comment = await bitrixCall("crm.timeline.comment.add", {
-      fields: {
-        ENTITY_ID: leadId,
-        ENTITY_TYPE: "lead",
-        COMMENT: `Файл с сайта: ${filename}`,
-        FILES: [[filename, content]],
-      },
+    let stdout = "";
+    child.stdout.on("data", (chunk: Buffer) => {
+      stdout += chunk.toString("utf8");
     });
-    if (!comment.ok) {
-      console.error("[contact/bitrix] crm.timeline.comment.add failed", filename);
-      return false;
-    }
-  }
+    child.stderr.on("data", () => {
+      // keep parent alive; do not log secrets from child
+    });
 
-  return true;
+    const timer = setTimeout(() => {
+      child.kill("SIGKILL");
+      console.error("[contact/resend] child timeout");
+      finish({ ok: false, error: "Send failed" });
+    }, 20000);
+
+    child.on("error", () => {
+      clearTimeout(timer);
+      console.error("[contact/resend] child error");
+      finish({ ok: false, error: "Send failed" });
+    });
+    child.on("close", (code) => {
+      clearTimeout(timer);
+      try {
+        const parsed = JSON.parse(stdout || "{}") as { ok?: boolean };
+        if (parsed.ok === true) {
+          finish({ ok: true });
+          return;
+        }
+      } catch {
+        // fall through
+      }
+      console.error("[contact/resend] child exit", code);
+      finish({ ok: false, error: "Send failed" });
+    });
+  });
 }
 
 export async function POST(request: Request) {
@@ -317,7 +274,6 @@ export async function POST(request: Request) {
     const clientIp = getClientIp(request);
     const userAgent = getUserAgent(request);
     const submittedAt = formatSubmittedAt();
-    const pageUrl = sourceUrl(request);
 
     const contactName = name || company;
     const contactCompany = company || name;
@@ -358,18 +314,14 @@ export async function POST(request: Request) {
       }
     }
 
-    if (!bitrixWebhookBase()) {
-      console.error("[contact/bitrix] BITRIX_WEBHOOK_URL is not set");
-      return NextResponse.json(
-        { ok: false, error: "Bitrix is not configured" },
-        { status: 502 },
-      );
-    }
-
     const titlePrefix = source === "estimator" ? "Заявка на расчёт" : "Заявка с сайта";
-    const title = `${titlePrefix} — ${contactCompany || contactName}`;
-    const comments = buildComments({
+    const subject = `${titlePrefix} — ${contactCompany || contactName}`;
+    const text = buildBodyText({
       source,
+      name: contactName,
+      company: contactCompany,
+      phone,
+      email,
       materialLabel,
       volumeLabel,
       scopeLabel,
@@ -377,7 +329,6 @@ export async function POST(request: Request) {
       clientIp,
       userAgent,
       submittedAt,
-      pageUrl,
       fileNames: files.map((file) => file.name),
     });
 
@@ -390,37 +341,16 @@ export async function POST(request: Request) {
       fileCount: files.length,
     });
 
-    const fields: Record<string, unknown> = {
-      TITLE: title,
-      NAME: contactName,
-      COMPANY_TITLE: contactCompany,
-      COMMENTS: comments,
-      SOURCE_ID: "WEB",
-      SOURCE_DESCRIPTION: "aldetali.ru",
-      OPENED: "Y",
-      EMAIL: [{ VALUE: email, VALUE_TYPE: "WORK" }],
-    };
-    if (phone) {
-      fields.PHONE = [{ VALUE: phone, VALUE_TYPE: "WORK" }];
-    }
-
-    const created = await bitrixCall("crm.lead.add", { fields });
-    const leadId = Number(created.ok ? created.result : NaN);
-    if (!created.ok || !Number.isFinite(leadId) || leadId <= 0) {
+    const sent = await sendViaResendChild({
+      replyTo: email,
+      subject,
+      text,
+    });
+    if (!sent.ok) {
       return NextResponse.json(
-        { ok: false, error: "Bitrix failed" },
+        { ok: false, error: sent.error ?? "Send failed" },
         { status: 502 },
       );
-    }
-
-    if (files.length > 0) {
-      const attached = await attachFilesToLead(leadId, files);
-      if (!attached) {
-        return NextResponse.json(
-          { ok: false, error: "Bitrix file upload failed" },
-          { status: 502 },
-        );
-      }
     }
 
     return NextResponse.json({ ok: true });
