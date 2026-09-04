@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
-const TO_EMAIL = process.env.CONTACT_TO_EMAIL ?? "zakaz@aldetali.ru";
+export const runtime = "nodejs";
+
 const ALLOWED_EXT = new Set(["pdf", "stp", "step", "jpg", "jpeg", "png"]);
 const MAX_FILE_BYTES = 15 * 1024 * 1024; // 15 MB
 const MAX_FIELD = {
@@ -27,11 +28,9 @@ function clip(value: string, max: number): string {
 }
 
 function isValidEmail(email: string): boolean {
-  // Practical server-side check (not full RFC)
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && email.length <= MAX_FIELD.email;
 }
 
-/** Client IP from common proxy / CDN headers. */
 function getClientIp(request: Request): string {
   const headers = request.headers;
   const forwarded = headers.get("x-forwarded-for");
@@ -53,7 +52,6 @@ function getUserAgent(request: Request): string {
   return ua.length > 400 ? ua.slice(0, 400) : ua;
 }
 
-/** Moscow local time for the email body, e.g. "07.08.2026 11:15 (МСК)". */
 function formatSubmittedAt(date = new Date()): string {
   const parts = new Intl.DateTimeFormat("ru-RU", {
     timeZone: "Europe/Moscow",
@@ -69,6 +67,173 @@ function formatSubmittedAt(date = new Date()): string {
     parts.find((p) => p.type === type)?.value ?? "";
 
   return `${get("day")}.${get("month")}.${get("year")} ${get("hour")}:${get("minute")} (МСК)`;
+}
+
+function sourceUrl(request: Request): string {
+  const referer = request.headers.get("referer")?.trim();
+  if (referer) return referer;
+  const host = (
+    request.headers.get("x-forwarded-host") ??
+    request.headers.get("host") ??
+    "aldetali.ru"
+  )
+    .split(",")[0]
+    ?.trim();
+  const proto = (
+    request.headers.get("x-forwarded-proto") ?? "https"
+  )
+    .split(",")[0]
+    ?.trim();
+  return `${proto}://${host}`;
+}
+
+function collectFiles(formData: FormData): File[] {
+  const files: File[] = [];
+  for (const value of formData.getAll("file")) {
+    if (value instanceof File && value.size > 0) files.push(value);
+  }
+  return files;
+}
+
+function bitrixWebhookBase(): string | null {
+  const raw = process.env.BITRIX_WEBHOOK_URL?.trim();
+  if (!raw) return null;
+  return raw.endsWith("/") ? raw : `${raw}/`;
+}
+
+function redactBitrix(text: string): string {
+  return text.replace(/\/rest\/\d+\/[A-Za-z0-9]+/gi, "/rest/***/***");
+}
+
+type BitrixResponse = {
+  result?: unknown;
+  error?: string;
+  error_description?: string;
+};
+
+async function bitrixCall(
+  method: string,
+  params: Record<string, unknown>,
+): Promise<{ ok: true; result: unknown } | { ok: false; error: string }> {
+  const base = bitrixWebhookBase();
+  if (!base) {
+    console.error("[contact/bitrix] BITRIX_WEBHOOK_URL is not set");
+    return { ok: false, error: "Bitrix is not configured" };
+  }
+
+  try {
+    const res = await fetch(`${base}${method}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify(params),
+    });
+    const raw = await res.text();
+    let data: BitrixResponse | null = null;
+    try {
+      data = JSON.parse(raw) as BitrixResponse;
+    } catch {
+      console.error("[contact/bitrix]", method, res.status, redactBitrix(raw.slice(0, 300)));
+      return { ok: false, error: "Bitrix failed" };
+    }
+    if (!res.ok || data.error) {
+      console.error(
+        "[contact/bitrix]",
+        method,
+        data.error ?? res.status,
+        redactBitrix(data.error_description ?? ""),
+      );
+      return { ok: false, error: "Bitrix failed" };
+    }
+    return { ok: true, result: data.result };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("[contact/bitrix]", method, redactBitrix(message));
+    return { ok: false, error: "Bitrix failed" };
+  }
+}
+
+function buildComments(params: {
+  source: string;
+  materialLabel: string;
+  volumeLabel: string;
+  scopeLabel: string;
+  message: string;
+  clientIp: string;
+  userAgent: string;
+  submittedAt: string;
+  pageUrl: string;
+  fileNames: string[];
+}): string {
+  const lines = [
+    `Источник: ${params.source === "estimator" ? "Заявка на расчёт (/process)" : "Контакты (/contact)"}`,
+    `URL: ${params.pageUrl}`,
+    "",
+    `Материал: ${params.materialLabel || "—"}`,
+  ];
+  if (params.volumeLabel) lines.push(`Годовой объём: ${params.volumeLabel}`);
+  if (params.scopeLabel) lines.push(`Что нужно: ${params.scopeLabel}`);
+  lines.push("", "Текст заявки:", params.message, "");
+  if (params.fileNames.length) {
+    lines.push("Файлы:", ...params.fileNames.map((name) => `— ${name}`), "");
+  }
+  lines.push(
+    "Технические данные",
+    `IP: ${params.clientIp}`,
+    `User-Agent: ${params.userAgent}`,
+    `Время: ${params.submittedAt}`,
+  );
+  return lines.join("\n");
+}
+
+async function fileToBase64(file: File): Promise<[string, string]> {
+  const buffer = Buffer.from(await file.arrayBuffer());
+  return [file.name, buffer.toString("base64")];
+}
+
+async function attachFilesToLead(leadId: number, files: File[]): Promise<boolean> {
+  const storageList = await bitrixCall("disk.storage.getlist", {});
+  let storageId: number | null = null;
+  if (storageList.ok && Array.isArray(storageList.result) && storageList.result.length > 0) {
+    const storages = storageList.result as { ID?: string | number }[];
+    const parsed = Number(storages[0]?.ID);
+    if (Number.isFinite(parsed) && parsed > 0) storageId = parsed;
+  } else {
+    console.error("[contact/bitrix] disk.storage.getlist failed");
+  }
+
+  for (const file of files) {
+    const [filename, content] = await fileToBase64(file);
+
+    if (storageId) {
+      const uploaded = await bitrixCall("disk.storage.uploadfile", {
+        id: storageId,
+        data: { NAME: filename },
+        fileContent: [filename, content],
+        generateUniqueName: true,
+      });
+      if (!uploaded.ok) {
+        console.error("[contact/bitrix] disk.storage.uploadfile failed", filename);
+      }
+    }
+
+    const comment = await bitrixCall("crm.timeline.comment.add", {
+      fields: {
+        ENTITY_ID: leadId,
+        ENTITY_TYPE: "lead",
+        COMMENT: `Файл с сайта: ${filename}`,
+        FILES: [[filename, content]],
+      },
+    });
+    if (!comment.ok) {
+      console.error("[contact/bitrix] crm.timeline.comment.add failed", filename);
+      return false;
+    }
+  }
+
+  return true;
 }
 
 export async function POST(request: Request) {
@@ -94,11 +259,12 @@ export async function POST(request: Request) {
     );
     const message = clip(String(formData.get("message") ?? "").trim(), MAX_FIELD.message);
     const source = clip(String(formData.get("source") ?? "contact").trim(), MAX_FIELD.source);
-    const file = formData.get("file");
+    const files = collectFiles(formData);
 
     const clientIp = getClientIp(request);
     const userAgent = getUserAgent(request);
     const submittedAt = formatSubmittedAt();
+    const pageUrl = sourceUrl(request);
 
     const contactName = name || company;
     const contactCompany = company || name;
@@ -117,7 +283,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // Only allow known sources
     if (source !== "contact" && source !== "estimator") {
       return NextResponse.json(
         { ok: false, error: "Invalid source" },
@@ -125,7 +290,7 @@ export async function POST(request: Request) {
       );
     }
 
-    if (file instanceof File && file.size > 0) {
+    for (const file of files) {
       if (!isAllowedFile(file)) {
         return NextResponse.json(
           { ok: false, error: "Unsupported file type" },
@@ -140,61 +305,69 @@ export async function POST(request: Request) {
       }
     }
 
-    const payload = {
-      name: contactName,
-      company: contactCompany,
-      phone,
-      email,
+    if (!bitrixWebhookBase()) {
+      console.error("[contact/bitrix] BITRIX_WEBHOOK_URL is not set");
+      return NextResponse.json(
+        { ok: false, error: "Bitrix is not configured" },
+        { status: 502 },
+      );
+    }
+
+    const titlePrefix = source === "estimator" ? "Заявка на расчёт" : "Заявка с сайта";
+    const title = `${titlePrefix} — ${contactCompany || contactName}`;
+    const comments = buildComments({
+      source,
       materialLabel,
       volumeLabel,
       scopeLabel,
       message,
-      source,
       clientIp,
       userAgent,
       submittedAt,
-      file: file instanceof File && file.size > 0 ? file : null,
-    };
-
-    console.info("[contact] submission", {
-      source: payload.source,
-      email: payload.email,
-      company: payload.company,
-      clientIp: payload.clientIp,
-      userAgent: payload.userAgent,
-      submittedAt: payload.submittedAt,
-      hasFile: Boolean(payload.file),
+      pageUrl,
+      fileNames: files.map((file) => file.name),
     });
 
-    // Prefer Resend when configured
-    const resendKey = process.env.RESEND_API_KEY;
-    if (resendKey) {
-      const sent = await sendViaResend({
-        apiKey: resendKey,
-        to: TO_EMAIL,
-        from: process.env.CONTACT_FROM_EMAIL ?? "onboarding@resend.dev",
-        ...payload,
-      });
-      if (!sent.ok) {
+    console.info("[contact] submission", {
+      source,
+      email,
+      company: contactCompany,
+      clientIp,
+      submittedAt,
+      fileCount: files.length,
+    });
+
+    const fields: Record<string, unknown> = {
+      TITLE: title,
+      NAME: contactName,
+      COMPANY_TITLE: contactCompany,
+      COMMENTS: comments,
+      SOURCE_ID: "WEB",
+      SOURCE_DESCRIPTION: "aldetali.ru",
+      OPENED: "Y",
+      EMAIL: [{ VALUE: email, VALUE_TYPE: "WORK" }],
+    };
+    if (phone) {
+      fields.PHONE = [{ VALUE: phone, VALUE_TYPE: "WORK" }];
+    }
+
+    const created = await bitrixCall("crm.lead.add", { fields });
+    const leadId = Number(created.ok ? created.result : NaN);
+    if (!created.ok || !Number.isFinite(leadId) || leadId <= 0) {
+      return NextResponse.json(
+        { ok: false, error: "Bitrix failed" },
+        { status: 502 },
+      );
+    }
+
+    if (files.length > 0) {
+      const attached = await attachFilesToLead(leadId, files);
+      if (!attached) {
         return NextResponse.json(
-          { ok: false, error: sent.error ?? "Send failed" },
+          { ok: false, error: "Bitrix file upload failed" },
           { status: 502 },
         );
       }
-      return NextResponse.json({ ok: true });
-    }
-
-    // Fallback: FormSubmit.co (first use requires one-time inbox confirmation)
-    const sent = await sendViaFormSubmit({
-      to: TO_EMAIL,
-      ...payload,
-    });
-
-    if (!sent.ok) {
-      return NextResponse.json(
-        { ok: false, error: sent.error ?? "Send failed" },
-        { status: 502 },
-      );
     }
 
     return NextResponse.json({ ok: true });
@@ -205,149 +378,4 @@ export async function POST(request: Request) {
       { status: 500 },
     );
   }
-}
-
-type MailPayload = {
-  name: string;
-  company: string;
-  phone: string;
-  email: string;
-  materialLabel: string;
-  volumeLabel: string;
-  scopeLabel: string;
-  message: string;
-  source: string;
-  clientIp: string;
-  userAgent: string;
-  submittedAt: string;
-  file: File | null;
-};
-
-function buildBodyText(params: Omit<MailPayload, "file">): string {
-  const lines = [
-    `Источник: ${params.source === "estimator" ? "Заявка на расчёт (/process)" : "Контакты"}`,
-    "",
-    `Имя: ${params.name}`,
-    `Компания: ${params.company}`,
-    `Телефон: ${params.phone || "—"}`,
-    `Email: ${params.email}`,
-    `Материал: ${params.materialLabel || "—"}`,
-  ];
-
-  if (params.volumeLabel) {
-    lines.push(`Годовой объём: ${params.volumeLabel}`);
-  }
-  if (params.scopeLabel) {
-    lines.push(`Что нужно: ${params.scopeLabel}`);
-  }
-
-  lines.push(
-    "",
-    "Комментарий:",
-    params.message,
-    "",
-    "Технические данные",
-    `IP: ${params.clientIp}`,
-    `User-Agent: ${params.userAgent}`,
-    `Время: ${params.submittedAt}`,
-  );
-
-  return lines.join("\n");
-}
-
-async function sendViaResend(
-  params: MailPayload & { apiKey: string; to: string; from: string },
-): Promise<{ ok: boolean; error?: string }> {
-  const bodyText = buildBodyText(params);
-
-  type ResendAttachment = { filename: string; content: string };
-  const attachments: ResendAttachment[] = [];
-
-  if (params.file) {
-    const buffer = Buffer.from(await params.file.arrayBuffer());
-    attachments.push({
-      filename: params.file.name,
-      content: buffer.toString("base64"),
-    });
-  }
-
-  const subjectPrefix =
-    params.source === "estimator" ? "Заявка на расчёт" : "Заявка с сайта";
-
-  const res = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${params.apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      from: params.from,
-      to: [params.to],
-      reply_to: params.email,
-      subject: `${subjectPrefix} — ${params.company || params.name}`,
-      text: bodyText,
-      attachments: attachments.length ? attachments : undefined,
-    }),
-  });
-
-  if (!res.ok) {
-    const detail = await res.text().catch(() => "");
-    console.error("[contact/resend]", res.status, detail);
-    return { ok: false, error: "Resend failed" };
-  }
-
-  return { ok: true };
-}
-
-async function sendViaFormSubmit(
-  params: MailPayload & { to: string },
-): Promise<{ ok: boolean; error?: string }> {
-  const payload = new FormData();
-  payload.append("name", params.name);
-  payload.append("company", params.company);
-  payload.append("phone", params.phone);
-  payload.append("email", params.email);
-  payload.append("material", params.materialLabel);
-  if (params.volumeLabel) payload.append("volume", params.volumeLabel);
-  if (params.scopeLabel) payload.append("scope", params.scopeLabel);
-  payload.append("message", params.message);
-  payload.append("source", params.source);
-  payload.append("client_ip", params.clientIp);
-  payload.append("user_agent", params.userAgent);
-  payload.append("submitted_at", params.submittedAt);
-  const subjectPrefix =
-    params.source === "estimator" ? "Заявка на расчёт" : "Заявка с сайта";
-  payload.append(
-    "_subject",
-    `${subjectPrefix} — ${params.company || params.name}`,
-  );
-  payload.append("_replyto", params.email);
-  payload.append("_template", "table");
-  payload.append("_captcha", "false");
-
-  if (params.file) {
-    payload.append("attachment", params.file, params.file.name);
-  }
-
-  const res = await fetch(`https://formsubmit.co/ajax/${params.to}`, {
-    method: "POST",
-    body: payload,
-    headers: { Accept: "application/json" },
-  });
-
-  if (!res.ok) {
-    const detail = await res.text().catch(() => "");
-    console.error("[contact/formsubmit]", res.status, detail);
-    return { ok: false, error: "FormSubmit failed" };
-  }
-
-  const data = (await res.json().catch(() => null)) as
-    | { success?: string | boolean }
-    | null;
-
-  if (data && data.success === false) {
-    return { ok: false, error: "FormSubmit rejected" };
-  }
-
-  return { ok: true };
 }
