@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import { brand } from "@/lib/content";
+import { SITE_ORIGIN, canonicalMeta } from "@/lib/site";
 import { YandexMetrika } from "@/components/analytics/YandexMetrika";
 import { LanguageProvider } from "@/components/providers/LanguageProvider";
 import "./globals.css";
@@ -21,7 +22,7 @@ const jetbrainsMono = JetBrains_Mono({
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://www.aldetali.com"),
+  metadataBase: new URL(SITE_ORIGIN),
   title: {
     default: `${brand.name} | ${brand.subtitle}`,
     template: `%s | ${brand.name}`,
@@ -38,16 +39,14 @@ export const metadata: Metadata = {
     "пресс-форма",
     "оснастка",
   ],
-  alternates: {
-    canonical: "/",
-  },
+  ...canonicalMeta("/"),
   openGraph: {
     title: `${brand.name} | ${brand.tagline}`,
     description: brand.description,
     type: "website",
     locale: "ru_RU",
     alternateLocale: ["en_US"],
-    url: "https://www.aldetali.com",
+    url: SITE_ORIGIN,
     siteName: brand.legalName,
   },
   robots: {

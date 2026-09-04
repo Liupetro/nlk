@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { brand } from "@/lib/content";
+import { canonicalMeta } from "@/lib/site";
 import { PageHero } from "@/components/motion/PageHero";
 import { TechnicalCapabilities } from "@/components/sections/TechnicalCapabilities";
 import { EquipmentCapabilities } from "@/components/sections/EquipmentCapabilities";
@@ -8,6 +9,7 @@ import { HomeCTA } from "@/components/sections/HomeCTA";
 export const metadata: Metadata = {
   title: "Возможности",
   description: `Технические параметры производства ${brand.name}: литьё алюминия под давлением, оборудование, оснастка.`,
+  ...canonicalMeta("/capabilities"),
 };
 
 export default function CapabilitiesPage() {

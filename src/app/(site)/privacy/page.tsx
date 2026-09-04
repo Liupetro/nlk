@@ -1,14 +1,13 @@
 import type { Metadata } from "next";
 import { brand } from "@/lib/content";
+import { canonicalMeta } from "@/lib/site";
 import { PageHero } from "@/components/motion/PageHero";
 import { PrivacyPolicy } from "@/components/sections/PrivacyPolicy";
 
 export const metadata: Metadata = {
   title: "Политика обработки персональных данных",
   description: `Политика в отношении обработки персональных данных ${brand.legalName}. Оператор: Андрей Скорняну. Сайт https://www.aldetali.com.`,
-  alternates: {
-    canonical: "/privacy",
-  },
+  ...canonicalMeta("/privacy"),
 };
 
 export default function PrivacyPage() {

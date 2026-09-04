@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { brand } from "@/lib/content";
+import { canonicalMeta } from "@/lib/site";
 import { PageHero } from "@/components/motion/PageHero";
 import { WhyChooseUs } from "@/components/sections/WhyChooseUs";
 import { HomeCTA } from "@/components/sections/HomeCTA";
@@ -7,6 +8,7 @@ import { HomeCTA } from "@/components/sections/HomeCTA";
 export const metadata: Metadata = {
   title: "Преимущества",
   description: `Почему выбирают ${brand.name}: расчёт за день, сплавы, контроль пористости, пробные образцы, механообработка и оснастка.`,
+  ...canonicalMeta("/advantages"),
 };
 
 export default function AdvantagesPage() {

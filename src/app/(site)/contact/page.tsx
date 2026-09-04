@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 import { brand } from "@/lib/content";
+import { canonicalMeta } from "@/lib/site";
 import { PageHero } from "@/components/motion/PageHero";
 import { FinalCTA } from "@/components/sections/FinalCTA";
 
 export const metadata: Metadata = {
   title: "Контакты",
   description: `Связаться с ${brand.name}: расчёт оснастки и деталей, email, телефон, форма заявки.`,
+  ...canonicalMeta("/contact"),
 };
 
 export default function ContactPage() {

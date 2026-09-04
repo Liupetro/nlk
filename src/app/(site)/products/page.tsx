@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { brand } from "@/lib/content";
+import { canonicalMeta } from "@/lib/site";
 import { PageHero } from "@/components/motion/PageHero";
 import { Industries } from "@/components/sections/Industries";
 import { ProductExamples } from "@/components/sections/ProductExamples";
@@ -8,6 +9,7 @@ import { HomeCTA } from "@/components/sections/HomeCTA";
 export const metadata: Metadata = {
   title: "Продукция",
   description: `Алюминиевые отливки под давлением ${brand.name}: промышленные, машиностроительные, электронные и другие детали. Серии от 200 шт.`,
+  ...canonicalMeta("/products"),
 };
 
 export default function ProductsPage() {

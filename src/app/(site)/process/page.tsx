@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { brand } from "@/lib/content";
+import { canonicalMeta } from "@/lib/site";
 import { PageHero } from "@/components/motion/PageHero";
 import { Process } from "@/components/sections/Process";
 import { ProjectEstimator } from "@/components/sections/ProjectEstimator";
@@ -8,6 +9,7 @@ import { HomeCTA } from "@/components/sections/HomeCTA";
 export const metadata: Metadata = {
   title: "Процесс работы",
   description: `От заявки и заказа оснастки до серийного производства деталей — полный процесс ${brand.name}: анализ, расчёт, оснастка, литьё, контроль и отгрузка.`,
+  ...canonicalMeta("/process"),
 };
 
 export default function ProcessPage() {
