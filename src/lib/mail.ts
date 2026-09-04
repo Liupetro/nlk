@@ -32,6 +32,7 @@ export async function sendViaSpacewebSmtp(
     console.error("[contact/smtp] SMTP_PASS is not set");
     return { ok: false, error: "SMTP is not configured" };
   }
+  return { ok: false, error: "SMTP not attempted" };
 
   let fileBase64: string | undefined;
   let fileName: string | undefined;
