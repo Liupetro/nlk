@@ -34,23 +34,13 @@ export async function YandexMetrika() {
           var host = (location.hostname || "").toLowerCase();
           var isRu = host.indexOf("aldetali.ru") !== -1;
           var id = isRu ? ${METRIKA_RU} : ${METRIKA_COM};
-          if (isRu) {
-            ym(id, "init", {
-              ssr: true,
-              webvisor: true,
-              clickmap: true,
-              ecommerce: "dataLayer",
-              accurateTrackBounce: true,
-              trackLinks: true
-            });
-          } else {
-            ym(id, "init", {
-              clickmap: true,
-              trackLinks: true,
-              accurateTrackBounce: true,
-              webvisor: true
-            });
-          }
+          // Do not pass ssr:true — tag.js then skips constructing the counter, so watch never fires.
+          ym(id, "init", {
+            clickmap: true,
+            trackLinks: true,
+            accurateTrackBounce: true,
+            webvisor: true
+          });
         })();
       `}</Script>
       <noscript>
