@@ -99,23 +99,25 @@ async function command(
   return reply;
 }
 
+function attachSocketGuard(socket: SmtpSocket, timeoutMs: number, fail: (err: Error) => void) {
+  socket.on("error", (err: Error) => fail(err));
+  socket.setTimeout(timeoutMs, () => fail(new Error("SMTP timeout")));
+}
+
 function connectTls(host: string, port: number, timeoutMs: number): Promise<TLSSocket> {
   return new Promise((resolve, reject) => {
-    const socket = tlsConnect({
-      host,
-      port,
-      servername: host,
-      timeout: timeoutMs,
-    });
-    const onError = (err: Error) => {
+    let settled = false;
+    const socket = tlsConnect({ host, port, servername: host });
+    const fail = (err: Error) => {
+      if (settled) return;
+      settled = true;
       socket.destroy();
       reject(err);
     };
-    socket.once("error", onError);
-    socket.once("timeout", () => onError(new Error("SMTP TLS timeout")));
+    attachSocketGuard(socket, timeoutMs, fail);
     socket.once("secureConnect", () => {
-      socket.off("error", onError);
-      socket.setTimeout(timeoutMs);
+      if (settled) return;
+      settled = true;
       resolve(socket);
     });
   });
@@ -123,16 +125,18 @@ function connectTls(host: string, port: number, timeoutMs: number): Promise<TLSS
 
 function connectPlain(host: string, port: number, timeoutMs: number): Promise<Socket> {
   return new Promise((resolve, reject) => {
-    const socket = netConnect({ host, port, timeout: timeoutMs });
-    const onError = (err: Error) => {
+    let settled = false;
+    const socket = netConnect({ host, port });
+    const fail = (err: Error) => {
+      if (settled) return;
+      settled = true;
       socket.destroy();
       reject(err);
     };
-    socket.once("error", onError);
-    socket.once("timeout", () => onError(new Error("SMTP connect timeout")));
+    attachSocketGuard(socket, timeoutMs, fail);
     socket.once("connect", () => {
-      socket.off("error", onError);
-      socket.setTimeout(timeoutMs);
+      if (settled) return;
+      settled = true;
       resolve(socket);
     });
   });
@@ -140,20 +144,18 @@ function connectPlain(host: string, port: number, timeoutMs: number): Promise<So
 
 async function startTls(socket: Socket, host: string, timeoutMs: number): Promise<TLSSocket> {
   return new Promise((resolve, reject) => {
-    const tlsSocket = tlsConnect({
-      socket,
-      host,
-      servername: host,
-      timeout: timeoutMs,
-    });
-    const onError = (err: Error) => {
+    let settled = false;
+    const tlsSocket = tlsConnect({ socket, host, servername: host });
+    const fail = (err: Error) => {
+      if (settled) return;
+      settled = true;
       tlsSocket.destroy();
       reject(err);
     };
-    tlsSocket.once("error", onError);
+    attachSocketGuard(tlsSocket, timeoutMs, fail);
     tlsSocket.once("secureConnect", () => {
-      tlsSocket.off("error", onError);
-      tlsSocket.setTimeout(timeoutMs);
+      if (settled) return;
+      settled = true;
       resolve(tlsSocket);
     });
   });
