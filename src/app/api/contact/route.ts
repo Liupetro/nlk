@@ -1,7 +1,4 @@
 import { NextResponse } from "next/server";
-import { sendViaSpacewebSmtp } from "@/lib/mail";
-
-export const runtime = "nodejs";
 
 const TO_EMAIL = process.env.CONTACT_TO_EMAIL ?? "zakaz@aldetali.ru";
 const ALLOWED_EXT = new Set(["pdf", "stp", "step", "jpg", "jpeg", "png"]);
@@ -169,14 +166,28 @@ export async function POST(request: Request) {
       hasFile: Boolean(payload.file),
     });
 
-    const subjectPrefix =
-      payload.source === "estimator" ? "Заявка на расчёт" : "Заявка с сайта";
-    const sent = await sendViaSpacewebSmtp({
+    // Prefer Resend when configured
+    const resendKey = process.env.RESEND_API_KEY;
+    if (resendKey) {
+      const sent = await sendViaResend({
+        apiKey: resendKey,
+        to: TO_EMAIL,
+        from: process.env.CONTACT_FROM_EMAIL ?? "onboarding@resend.dev",
+        ...payload,
+      });
+      if (!sent.ok) {
+        return NextResponse.json(
+          { ok: false, error: sent.error ?? "Send failed" },
+          { status: 502 },
+        );
+      }
+      return NextResponse.json({ ok: true });
+    }
+
+    // Fallback: FormSubmit.co (first use requires one-time inbox confirmation)
+    const sent = await sendViaFormSubmit({
       to: TO_EMAIL,
-      replyTo: payload.email,
-      subject: `${subjectPrefix} — ${payload.company || payload.name}`,
-      text: buildBodyText(payload),
-      file: payload.file,
+      ...payload,
     });
 
     if (!sent.ok) {
@@ -242,4 +253,101 @@ function buildBodyText(params: Omit<MailPayload, "file">): string {
   );
 
   return lines.join("\n");
+}
+
+async function sendViaResend(
+  params: MailPayload & { apiKey: string; to: string; from: string },
+): Promise<{ ok: boolean; error?: string }> {
+  const bodyText = buildBodyText(params);
+
+  type ResendAttachment = { filename: string; content: string };
+  const attachments: ResendAttachment[] = [];
+
+  if (params.file) {
+    const buffer = Buffer.from(await params.file.arrayBuffer());
+    attachments.push({
+      filename: params.file.name,
+      content: buffer.toString("base64"),
+    });
+  }
+
+  const subjectPrefix =
+    params.source === "estimator" ? "Заявка на расчёт" : "Заявка с сайта";
+
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${params.apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: params.from,
+      to: [params.to],
+      reply_to: params.email,
+      subject: `${subjectPrefix} — ${params.company || params.name}`,
+      text: bodyText,
+      attachments: attachments.length ? attachments : undefined,
+    }),
+  });
+
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    console.error("[contact/resend]", res.status, detail);
+    return { ok: false, error: "Resend failed" };
+  }
+
+  return { ok: true };
+}
+
+async function sendViaFormSubmit(
+  params: MailPayload & { to: string },
+): Promise<{ ok: boolean; error?: string }> {
+  const payload = new FormData();
+  payload.append("name", params.name);
+  payload.append("company", params.company);
+  payload.append("phone", params.phone);
+  payload.append("email", params.email);
+  payload.append("material", params.materialLabel);
+  if (params.volumeLabel) payload.append("volume", params.volumeLabel);
+  if (params.scopeLabel) payload.append("scope", params.scopeLabel);
+  payload.append("message", params.message);
+  payload.append("source", params.source);
+  payload.append("client_ip", params.clientIp);
+  payload.append("user_agent", params.userAgent);
+  payload.append("submitted_at", params.submittedAt);
+  const subjectPrefix =
+    params.source === "estimator" ? "Заявка на расчёт" : "Заявка с сайта";
+  payload.append(
+    "_subject",
+    `${subjectPrefix} — ${params.company || params.name}`,
+  );
+  payload.append("_replyto", params.email);
+  payload.append("_template", "table");
+  payload.append("_captcha", "false");
+
+  if (params.file) {
+    payload.append("attachment", params.file, params.file.name);
+  }
+
+  const res = await fetch(`https://formsubmit.co/ajax/${params.to}`, {
+    method: "POST",
+    body: payload,
+    headers: { Accept: "application/json" },
+  });
+
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    console.error("[contact/formsubmit]", res.status, detail);
+    return { ok: false, error: "FormSubmit failed" };
+  }
+
+  const data = (await res.json().catch(() => null)) as
+    | { success?: string | boolean }
+    | null;
+
+  if (data && data.success === false) {
+    return { ok: false, error: "FormSubmit rejected" };
+  }
+
+  return { ok: true };
 }
