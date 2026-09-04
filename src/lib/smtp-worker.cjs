@@ -179,24 +179,50 @@ async function sendOnPort(data, port) {
   }
 }
 
-async function main() {
-  const data = workerData;
+async function run(data) {
   if (!data || !data.pass) {
-    fail("SMTP is not configured");
-    return;
+    return { ok: false, error: "SMTP is not configured" };
   }
   const ports = data.port ? [Number(data.port)] : [465, 587];
   let lastError = "SMTP failed";
   for (const port of ports) {
     try {
       await sendOnPort(data, port);
-      ok();
-      return;
+      return { ok: true };
     } catch (error) {
       lastError = error instanceof Error ? error.message : String(error);
     }
   }
-  fail(lastError);
+  return { ok: false, error: lastError };
 }
 
-main().catch((error) => fail(error instanceof Error ? error.message : String(error)));
+if (require.main === module) {
+  let payload = {};
+  try {
+    payload = JSON.parse(process.env.SMTP_JOB || "{}");
+  } catch {
+    process.stdout.write(JSON.stringify({ ok: false, error: "SMTP job is invalid" }));
+    process.exit(1);
+  }
+  run(payload)
+    .then((result) => {
+      process.stdout.write(JSON.stringify(result));
+      process.exit(result.ok ? 0 : 2);
+    })
+    .catch((error) => {
+      process.stdout.write(
+        JSON.stringify({
+          ok: false,
+          error: error instanceof Error ? error.message : String(error),
+        }),
+      );
+      process.exit(2);
+    });
+} else if (parentPort) {
+  run(workerData)
+    .then((result) => {
+      if (result.ok) ok();
+      else fail(result.error);
+    })
+    .catch((error) => fail(error instanceof Error ? error.message : String(error)));
+}

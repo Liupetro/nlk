@@ -1,4 +1,4 @@
-import { Worker } from "node:worker_threads";
+import { spawn } from "node:child_process";
 import path from "node:path";
 
 const DEFAULT_MAILBOX = "zakaz@aldetali.ru";
@@ -42,6 +42,21 @@ export async function sendViaSpacewebSmtp(
     fileType = input.file.type || undefined;
   }
 
+  const job = {
+    host: smtp.host,
+    port: smtp.port,
+    user: smtp.user,
+    pass: smtp.pass,
+    from: smtp.from,
+    to: input.to,
+    replyTo: input.replyTo,
+    subject: input.subject,
+    text: input.text,
+    fileBase64,
+    fileName,
+    fileType,
+  };
+
   return new Promise((resolve) => {
     let settled = false;
     const finish = (result: { ok: true } | { ok: false; error: string }) => {
@@ -50,55 +65,53 @@ export async function sendViaSpacewebSmtp(
       resolve(result);
     };
 
-    let worker: Worker;
+    let child;
     try {
-      worker = new Worker(workerPath(), {
-        workerData: {
-          host: smtp.host,
-          port: smtp.port,
-          user: smtp.user,
-          pass: smtp.pass,
-          from: smtp.from,
-          to: input.to,
-          replyTo: input.replyTo,
-          subject: input.subject,
-          text: input.text,
-          fileBase64,
-          fileName,
-          fileType,
-        },
+      child = spawn(process.execPath, [workerPath()], {
+        env: { ...process.env, SMTP_JOB: JSON.stringify(job) },
+        stdio: ["ignore", "pipe", "pipe"],
+        windowsHide: true,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      console.error("[contact/smtp] worker start", message);
+      console.error("[contact/smtp] spawn", message);
       finish({ ok: false, error: "SMTP failed" });
       return;
     }
 
-    const timer = setTimeout(() => {
-      worker.terminate().catch(() => undefined);
-      finish({ ok: false, error: "SMTP failed" });
-    }, 20000);
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", (chunk: Buffer) => {
+      stdout += chunk.toString("utf8");
+    });
+    child.stderr.on("data", (chunk: Buffer) => {
+      stderr += chunk.toString("utf8");
+    });
 
-    worker.on("message", (msg: { ok?: boolean; error?: string }) => {
+    const timer = setTimeout(() => {
+      child.kill("SIGKILL");
+      finish({ ok: false, error: "SMTP failed" });
+    }, 25000);
+
+    child.on("error", (error) => {
       clearTimeout(timer);
-      if (msg && msg.ok) finish({ ok: true });
-      else {
-        console.error("[contact/smtp]", msg?.error);
-        finish({ ok: false, error: "SMTP failed" });
-      }
-    });
-    worker.on("error", (error) => {
-      clearTimeout(timer);
-      console.error("[contact/smtp] worker", error);
+      console.error("[contact/smtp] child", error);
       finish({ ok: false, error: "SMTP failed" });
     });
-    worker.on("exit", (code) => {
+    child.on("close", (code) => {
       clearTimeout(timer);
-      if (!settled) {
-        console.error("[contact/smtp] worker exit", code);
-        finish({ ok: false, error: "SMTP failed" });
+      if (stderr.trim()) console.error("[contact/smtp] stderr", stderr.trim());
+      try {
+        const parsed = JSON.parse(stdout || "{}") as { ok?: boolean; error?: string };
+        if (parsed.ok) {
+          finish({ ok: true });
+          return;
+        }
+        console.error("[contact/smtp]", parsed.error || `exit ${code}`);
+      } catch {
+        console.error("[contact/smtp] bad child output", stdout, stderr);
       }
+      finish({ ok: false, error: "SMTP failed" });
     });
   });
 }
