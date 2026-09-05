@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/Button";
 import { MaterialSelect } from "@/components/ui/MaterialSelect";
 import { Reveal } from "@/components/ui/Reveal";
 import { cn } from "@/lib/utils";
+import { sendLeadClient } from "@/lib/clientSubmit";
 
 type FormState = {
   material: string;
@@ -117,10 +118,10 @@ export function ProjectEstimator() {
     data.set(
       "message",
       [
-        "Заявка на расчёт с сайта (/process)",
-        `Материал: ${materialLabel}`,
-        `Годовой объём: ${volumeLabel}`,
-        `Что нужно: ${scopeLabel}`,
+        "Р—Р°СЏРІРєР° РЅР° СЂР°СЃС‡С‘С‚ СЃ СЃР°Р№С‚Р° (/process)",
+        `РњР°С‚РµСЂРёР°Р»: ${materialLabel}`,
+        `Р“РѕРґРѕРІРѕР№ РѕР±СЉС‘Рј: ${volumeLabel}`,
+        `Р§С‚Рѕ РЅСѓР¶РЅРѕ: ${scopeLabel}`,
       ].join("\n"),
     );
     data.set("source", "estimator");
@@ -131,20 +132,10 @@ export function ProjectEstimator() {
 
     setSubmitting(true);
     try {
-      const res = await fetch("/api/contact", {
-        method: "POST",
-        body: data,
+      await sendLeadClient(data, {
+        source: "estimator",
+        subjectName: form.company,
       });
-      const json = (await res.json().catch(() => null)) as {
-        ok?: boolean;
-        error?: string;
-      } | null;
-
-      if (!res.ok || !json?.ok) {
-        setError(estimator.errorMessage);
-        return;
-      }
-
       setSubmittedCompany(form.company);
       setSubmitted(true);
       setForm(initial);
@@ -454,3 +445,4 @@ function OptionGrid({
     </div>
   );
 }
+

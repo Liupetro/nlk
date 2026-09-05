@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useRef, useState, type ComponentType } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -13,6 +13,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { useT } from "@/components/providers/LanguageProvider";
+import { sendLeadClient } from "@/lib/clientSubmit";
 import { Container } from "@/components/ui/Container";
 import { Button } from "@/components/ui/Button";
 import { MaterialSelect } from "@/components/ui/MaterialSelect";
@@ -92,20 +93,10 @@ export function FinalCTA({ showHeading = true }: Props) {
 
     setSubmitting(true);
     try {
-      const res = await fetch("/api/contact", {
-        method: "POST",
-        body: data,
+      await sendLeadClient(data, {
+        source: "contact",
+        subjectName: String(data.get("company") || data.get("name") || ""),
       });
-      const json = (await res.json().catch(() => null)) as {
-        ok?: boolean;
-        error?: string;
-      } | null;
-
-      if (!res.ok || !json?.ok) {
-        setError(contact.errorMessage);
-        return;
-      }
-
       setSubmitted(true);
       form.reset();
       setMaterial("");
@@ -304,7 +295,7 @@ export function FinalCTA({ showHeading = true }: Props) {
                       <span className="block text-sm font-medium text-white/80 leading-snug">
                         {contact.fileBrowse}
                         <span className="font-normal text-white/45">
-                          {" · "}
+                          {" В· "}
                           {contact.fileDrop}
                         </span>
                       </span>
@@ -472,3 +463,4 @@ function ContactLine({
 
   return <div className="flex items-start gap-3">{content}</div>;
 }
+
