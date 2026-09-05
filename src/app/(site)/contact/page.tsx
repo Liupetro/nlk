@@ -1,8 +1,9 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import { brand } from "@/lib/content";
 import { canonicalMeta } from "@/lib/site";
 import { PageHero } from "@/components/motion/PageHero";
 import { FinalCTA } from "@/components/sections/FinalCTA";
+import { BitrixCrmForm } from "@/components/sections/BitrixCrmForm";
 
 export const metadata: Metadata = {
   title: "Контакты",
@@ -27,6 +28,8 @@ export default function ContactPage() {
         compact
       />
       <FinalCTA showHeading={false} />
+      <BitrixCrmForm />
     </>
   );
 }
+
