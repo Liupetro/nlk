@@ -318,7 +318,7 @@ export function ProjectEstimator() {
                     <span className="truncate text-sm text-white/70">
                       {files.map(f => f.name).join(", ")}
                       <span className="ml-2 text-xs text-white/35">
-                        ({(file.size / 1024).toFixed(0)} KB)
+                        ({(files.reduce((n, f) => n + f.size, 0) / 1024).toFixed(0)} KB)
                       </span>
                     </span>
                     <button
@@ -443,5 +443,6 @@ function OptionGrid({
     </div>
   );
 }
+
 
 
