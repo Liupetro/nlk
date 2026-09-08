@@ -50,7 +50,7 @@ export function ProjectEstimator() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState<FormState>(initial);
-  const [files, setFiles] = useState<File[]>([]);
+  const [file, setFile] = useState<File | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [fileError, setFileError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
@@ -65,23 +65,23 @@ export function ProjectEstimator() {
     (next: File | null) => {
       setFileError(null);
       if (!next) {
-        setFiles([]);
+        setFile(null);
         if (fileInputRef.current) fileInputRef.current.value = "";
         return;
       }
       if (!isAllowedFile(next)) {
-        setFiles([]);
+        setFile(null);
         setFileError(estimator.fileErrorType);
         if (fileInputRef.current) fileInputRef.current.value = "";
         return;
       }
       if (next.size > MAX_FILE_BYTES) {
-        setFiles([]);
+        setFile(null);
         setFileError(estimator.fileErrorSize);
         if (fileInputRef.current) fileInputRef.current.value = "";
         return;
       }
-      setFiles((prev) => prev.length >= 5 ? prev : [...prev, next]);
+      setFile(next);
     },
     [estimator.fileErrorType, estimator.fileErrorSize],
   );
@@ -126,7 +126,9 @@ export function ProjectEstimator() {
     );
     data.set("source", "estimator");
 
-    files.forEach((item) => data.append("file", item, item.name));
+    if (file) {
+      data.set("file", file);
+    }
 
     setSubmitting(true);
     try {
@@ -304,7 +306,7 @@ export function ProjectEstimator() {
                   <input
                     ref={fileInputRef}
                     type="file"
-                    accept={ACCEPT_ATTR} multiple
+                    accept={ACCEPT_ATTR}
                     className="sr-only"
                     onChange={(ev) => {
                       const next = ev.target.files?.[0] ?? null;
@@ -313,12 +315,12 @@ export function ProjectEstimator() {
                   />
                 </div>
 
-                {files[0] && (
+                {file && (
                   <div className="mt-2 flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-3.5 py-2">
                     <span className="truncate text-sm text-white/70">
-                      {files.map(f => f.name).join(", ")}
+                      {file.name}
                       <span className="ml-2 text-xs text-white/35">
-                        ({(files.reduce((n, f) => n + f.size, 0) / 1024).toFixed(0)} KB)
+                        ({(file.size / 1024).toFixed(0)} KB)
                       </span>
                     </span>
                     <button
@@ -443,6 +445,4 @@ function OptionGrid({
     </div>
   );
 }
-
-
 

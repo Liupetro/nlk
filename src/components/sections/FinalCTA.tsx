@@ -41,7 +41,7 @@ export function FinalCTA({ showHeading = true }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [material, setMaterial] = useState("");
-  const [files, setFiles] = useState<File[]>([]);
+  const [file, setFile] = useState<File | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [fileError, setFileError] = useState<string | null>(null);
 
@@ -49,23 +49,23 @@ export function FinalCTA({ showHeading = true }: Props) {
     (next: File | null) => {
       setFileError(null);
       if (!next) {
-        setFiles([]);
+        setFile(null);
         if (fileInputRef.current) fileInputRef.current.value = "";
         return;
       }
       if (!isAllowedFile(next)) {
-        setFiles([]);
+        setFile(null);
         setFileError(contact.fileErrorType);
         if (fileInputRef.current) fileInputRef.current.value = "";
         return;
       }
       if (next.size > MAX_FILE_BYTES) {
-        setFiles([]);
+        setFile(null);
         setFileError(contact.fileErrorSize);
         if (fileInputRef.current) fileInputRef.current.value = "";
         return;
       }
-      setFiles((prev) => prev.length >= 5 ? prev : [...prev, next]);
+      setFile(next);
     },
     [contact.fileErrorType, contact.fileErrorSize],
   );
@@ -78,7 +78,11 @@ export function FinalCTA({ showHeading = true }: Props) {
     const form = e.currentTarget;
     const data = new FormData(form);
 
-    files.forEach((item) => data.append("file", item, item.name));
+    if (file) {
+      data.set("file", file);
+    } else {
+      data.delete("file");
+    }
 
     const materialValue = material || String(data.get("material") ?? "");
     const materialLabel =
@@ -273,7 +277,8 @@ export function FinalCTA({ showHeading = true }: Props) {
                     onDrop={(ev) => {
                       ev.preventDefault();
                       setDragOver(false);
-                      Array.from(ev.dataTransfer.files || []).forEach((f) => setSelectedFile(f));
+                      const dropped = ev.dataTransfer.files?.[0];
+                      if (dropped) setSelectedFile(dropped);
                     }}
                     onClick={() => fileInputRef.current?.click()}
                     className={[
@@ -302,20 +307,21 @@ export function FinalCTA({ showHeading = true }: Props) {
                       ref={fileInputRef}
                       type="file"
                       name="file"
-                      accept={ACCEPT_ATTR} multiple
+                      accept={ACCEPT_ATTR}
                       className="sr-only"
                       onChange={(ev) => {
-                        Array.from(ev.target.files || []).forEach((f) => setSelectedFile(f));
+                        const next = ev.target.files?.[0] ?? null;
+                        setSelectedFile(next);
                       }}
                     />
                   </div>
 
-                  {files[0] && (
+                  {file && (
                     <div className="mt-1.5 flex items-center justify-between gap-3 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-1.5">
                       <span className="truncate text-sm text-white/70">
-                        {files.map(f => f.name).join(", ")}
+                        {file.name}
                         <span className="ml-2 text-xs text-white/35">
-                          ({(files.reduce((n, f) => n + f.size, 0) / 1024).toFixed(0)} KB)
+                          ({(file.size / 1024).toFixed(0)} KB)
                         </span>
                       </span>
                       <button
@@ -457,7 +463,4 @@ function ContactLine({
 
   return <div className="flex items-start gap-3">{content}</div>;
 }
-
-
-
 
