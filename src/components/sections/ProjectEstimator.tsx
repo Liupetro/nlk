@@ -118,10 +118,10 @@ export function ProjectEstimator() {
     data.set(
       "message",
       [
-        "\u0417\u0430\u044f\u0432\u043a\u0430 \u043d\u0430 \u0440\u0430\u0441\u0447\u0451\u0442 \u0441 \u0441\u0430\u0439\u0442\u0430 (/process)",
-        "\u041c\u0430\u0442\u0435\u0440\u0438\u0430\u043b: " + materialLabel,
-        "\u0413\u043e\u0434\u043e\u0432\u043e\u0439 \u043e\u0431\u044a\u0451\u043c: " + volumeLabel,
-        "\u0427\u0442\u043e \u043d\u0443\u0436\u043d\u043e: " + scopeLabel,
+        "Р—Р°СЏРІРєР° РЅР° СЂР°СЃС‡С‘С‚ СЃ СЃР°Р№С‚Р° (/process)",
+        `РњР°С‚РµСЂРёР°Р»: ${materialLabel}`,
+        `Р“РѕРґРѕРІРѕР№ РѕР±СЉС‘Рј: ${volumeLabel}`,
+        `Р§С‚Рѕ РЅСѓР¶РЅРѕ: ${scopeLabel}`,
       ].join("\n"),
     );
     data.set("source", "estimator");
@@ -443,7 +443,6 @@ function OptionGrid({
     </div>
   );
 }
-
 
 
 
