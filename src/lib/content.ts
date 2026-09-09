@@ -268,6 +268,7 @@ export type SiteContent = {
   };
   footer: {
     blurb: string;
+    legalNote: string;
     columns: {
       title: string;
       links: { label: string; href: string }[];
@@ -291,9 +292,9 @@ const en: SiteContent = {
     legalName: "Nevskaya Liteynaya Kompaniya",
     tagline: "Precision aluminum die casting.",
     subtitle:
-      "Aluminum high-pressure die casting. Full cycle — from drawing to finished part.",
+      "Aluminum high-pressure die casting. We take the project on — from drawing to finished part.",
     description:
-      "Nevskaya Liteynaya Kompaniya organizes production of precision aluminum parts by high-pressure die casting. Full cycle: tooling design and manufacture or work with your die, casting, machining, QC, and shipment. Series from 200 pcs.",
+      "Nevskaya Liteynaya Kompaniya organizes production of precision aluminum parts by high-pressure die casting. We take the project on — from drawing to finished part: tooling design and manufacture or work with your die, casting, machining, QC, and shipment. Series from 200 pcs.",
   },
   nav: [
     { label: "About", href: "/about" },
@@ -317,13 +318,12 @@ const en: SiteContent = {
     bullets: [
       "Series from 200 pcs",
       "We work with your tooling or manufacture new tooling",
-      "Full cycle — from drawing to shipment",
+      "We take the project on — from drawing to shipment",
       "We help relocate production and reduce unit cost",
     ],
     primaryCta: { label: "Calculate from drawing", href: "/contact" },
     floatingStats: [
       { value: "10+", unit: "", label: "years of experience" },
-      { value: "700k", unit: "", label: "parts per year" },
       { value: "98%", unit: "", label: "on-time deliveries" },
     ],
   },
@@ -337,28 +337,16 @@ const en: SiteContent = {
         description: "In aluminum high-pressure die casting",
       },
       {
-        value: 700,
-        suffix: "k",
-        label: "parts per year",
-        description: "Produced annually",
-      },
-      {
         value: 98,
         suffix: "%",
         label: "on time",
         description: "Orders shipped on schedule",
       },
       {
-        value: 4,
-        suffix: "",
-        label: "machines",
-        description: "Casting cells in production",
-      },
-      {
         value: 1,
         suffix: "",
         label: "supplier",
-        description: "Full cycle — from tooling to finished part",
+        description: "We take the project on — from drawing to finished part",
       },
     ],
   },
@@ -369,8 +357,8 @@ const en: SiteContent = {
     accent: "the company",
     description: "",
     paragraphs: [
-      "Nevskaya Liteynaya Kompaniya is a Russian company specializing in high-pressure aluminum die casting.",
-      "We help industrial enterprises and OEM customers launch series of aluminum parts without unnecessary risk: we take on tooling, casting, quality control, and shipment preparation.",
+      "Nevskaya Liteynaya Kompaniya supports projects for manufacturing aluminum parts by high-pressure die casting.",
+      "We take on tooling work, organizing manufacture, quality control, and shipment preparation.",
     ],
     listTitle: "Why it is calmer to work with us:",
     highlights: [
@@ -386,10 +374,10 @@ const en: SiteContent = {
   capabilities: {
     eyebrow: "Capabilities",
     number: "05",
-    title: "Full cycle",
+    title: "From drawing to finished part",
     accent: "",
     description:
-      "Full production cycle under one roof — short lead times, quality control at every stage, and no unnecessary intermediaries.",
+      "We take the project on — from drawing to finished part. Short lead times and quality control at every stage.",
     bottomNote:
       "QC (OTK): visual inspection of every part, control measurements, and porosity checks. For quoting and launch, preferably send a 3D model in STEP format (.stp).",
     bottomCta: "Get a quote",
@@ -621,14 +609,14 @@ const en: SiteContent = {
       {
         title: "All aluminum grades",
         description:
-          "We use aluminum casting alloys per GOST 1583-93 — from common grades to special grades per custom specifications.",
+          "We organize manufacturing of parts from alloys per GOST 1583-93 and per the customer’s specifications.",
         image: "/advantages/adv-02-ingots.jpg",
         imageAlt: "Stack of aluminum casting ingots — cold industrial metal pack",
       },
       {
         title: "Porosity in parts — to a minimum",
         description:
-          "We reduce gas porosity in aluminum castings to a minimum through melt degassing, process setup, and inspection of trial parts before series.",
+          "We minimize porosity in parts: requirements are fixed before the series; at the production site — melt degassing, process setup, and trial part inspection.",
         image: "/advantages/adv-03-porosity.jpg",
         imageAlt:
           "Comparison: aluminum casting section with gas porosity versus the same part with a dense structure",
@@ -637,21 +625,21 @@ const en: SiteContent = {
       {
         title: "Trial sample setup",
         description:
-          "Before series, we fine-tune the casting process and inspect trial parts. Production starts only after quality confirmation.",
+          "Before the series — process setup and trial parts. Serial production starts after quality is confirmed.",
         image: "/advantages/adv-04-trial.jpg",
         imageAlt: "Trial die-cast aluminum parts after process setup and inspection",
       },
       {
         title: "Machining",
         description:
-          "When needed, we perform turning and milling per the customer's technical specification.",
+          "When required, we organize turning and milling to the customer’s technical specification.",
         image: "/advantages/adv-05-machining.jpg",
         imageAlt: "CNC machining of aluminum die-cast part — turning and milling",
       },
       {
         title: "Repair of your tooling",
         description:
-          "We accept an existing die, run diagnostics and current repair, then start casting.",
+          "We accept your die: diagnostics, repair, and preparation for order launch.",
         image: "/advantages/adv-06-tooling.jpg",
         imageAlt: "High-pressure die casting mold tooling diagnostics and maintenance",
       },
@@ -944,7 +932,9 @@ const en: SiteContent = {
   },
   footer: {
     blurb:
-      "Nevskaya Liteynaya Kompaniya organizes production of precision aluminum parts by high-pressure die casting. Full cycle — from drawing to finished part. Series from 200 pcs.",
+      "Nevskaya Liteynaya Kompaniya organizes production of precision aluminum parts by high-pressure die casting. We take the project on — from drawing to finished part. Series from 200 pcs.",
+    legalNote:
+      "Nevskaya Liteynaya Kompaniya is a commercial name used by OOO “TD NSK”.",
     columns: [
       {
         title: "Company",
@@ -983,9 +973,9 @@ const ru: SiteContent = {
     legalName: "Невская Литейная Компания",
     tagline: "Точное алюминиевое литьё.",
     subtitle:
-      "Алюминиевое литьё под давлением. Полный цикл — от чертежа до готовой детали.",
+      "Алюминиевое литьё под давлением. Берём проект на себя — от чертежа до готовой детали.",
     description:
-      "Невская Литейная Компания организует производство точных алюминиевых деталей методом литья под давлением. Полный цикл: проектирование и изготовление оснастки или работа с вашей, литьё, механообработка, контроль качества (ОТК) и отгрузка. Серии от 200 шт.",
+      "Невская Литейная Компания организует производство точных алюминиевых деталей методом литья под давлением. Берём проект на себя — от чертежа до готовой детали: проектирование и изготовление оснастки или работа с вашей, литьё, механообработка, контроль качества (ОТК) и отгрузка. Серии от 200 шт.",
   },
   nav: [
     { label: "О компании", href: "/about" },
@@ -1009,13 +999,12 @@ const ru: SiteContent = {
     bullets: [
       "Серии от 200 шт.",
       "Работаем с вашей оснасткой или изготовим новую",
-      "Полный цикл — от чертежа до отгрузки",
+      "Берём проект на себя — от чертежа до отгрузки",
       "Помогаем перенести производство и снизить себестоимость",
     ],
     primaryCta: { label: "Рассчитать по чертежу", href: "/contact" },
     floatingStats: [
       { value: "10+", unit: "", label: "лет опыта" },
-      { value: "700 тыс.", unit: "", label: "деталей в год" },
       { value: "98 %", unit: "", label: "поставок в срок" },
     ],
   },
@@ -1029,28 +1018,16 @@ const ru: SiteContent = {
         description: "В литье алюминия под давлением",
       },
       {
-        value: 700,
-        suffix: " тыс.",
-        label: "деталей в год",
-        description: "Производим ежегодно",
-      },
-      {
         value: 98,
         suffix: "%",
         label: "в срок",
         description: "Заказов отгружаем точно в срок",
       },
       {
-        value: 4,
-        suffix: "",
-        label: "машины",
-        description: "Литейные комплексы в работе",
-      },
-      {
         value: 1,
         suffix: "",
         label: "поставщик",
-        description: "Полный цикл — от оснастки до готовой детали",
+        description: "Берём проект на себя — от чертежа до готовой детали",
       },
     ],
   },
@@ -1061,8 +1038,8 @@ const ru: SiteContent = {
     accent: "компании",
     description: "",
     paragraphs: [
-      "Невская Литейная Компания — российская компания, специализирующаяся на литье алюминия под давлением.",
-      "Мы помогаем промышленным предприятиям и OEM-заказчикам запускать серии алюминиевых деталей без лишних рисков: берём на себя оснастку, литьё, контроль качества и подготовку к отгрузке.",
+      "Невская Литейная Компания сопровождает проекты по изготовлению алюминиевых деталей методом литья под давлением.",
+      "Берём на себя работу с оснасткой, организацию изготовления, контроль качества и подготовку к отгрузке.",
     ],
     listTitle: "Почему с нами спокойнее:",
     highlights: [
@@ -1078,10 +1055,10 @@ const ru: SiteContent = {
   capabilities: {
     eyebrow: "Возможности",
     number: "05",
-    title: "Полный цикл",
+    title: "От чертежа до готовой детали",
     accent: "",
     description:
-      "Полный производственный цикл под одной крышей — короткие сроки, контроль качества на каждом этапе и отсутствие лишних посредников.",
+      "Берём проект на себя — от чертежа до готовой детали. Короткие сроки и контроль качества на каждом этапе.",
     bottomNote:
       "ОТК: визуальный осмотр каждой детали, контрольные замеры и проверка на пористость. Для расчёта и запуска предпочтительно присылать 3D-модель в формате STEP (.stp).",
     bottomCta: "Получить расчёт",
@@ -1313,14 +1290,14 @@ const ru: SiteContent = {
       {
         title: "Работаем со всеми марками алюминия",
         description:
-          "Используем алюминиевые литейные сплавы по ГОСТ 1583-93 — от распространённых до специальных марок по индивидуальному ТУ.",
+          "Организуем изготовление деталей из сплавов по ГОСТ 1583-93 и по техническим условиям заказчика.",
         image: "/advantages/adv-02-ingots.jpg",
         imageAlt: "Штабель алюминиевых чушек — холодный индустриальный металл",
       },
       {
         title: "Пористость в деталях — к минимуму",
         description:
-          "Сводим газовую пористость в алюминиевых отливках к минимуму за счёт дегазации расплава, наладки режима и проверки пробных деталей до серии.",
+          "Сводим пористость в деталях к минимуму: требования фиксируем до серии; на производственной базе — дегазация расплава, наладка режима и проверка пробных деталей.",
         image: "/advantages/adv-03-porosity.jpg",
         imageAlt:
           "Сравнение: разрез алюминиевой отливки с газовой пористостью и та же деталь с плотной структурой",
@@ -1329,21 +1306,21 @@ const ru: SiteContent = {
       {
         title: "Наладка пробных образцов",
         description:
-          "Перед серией доводим режим литья и проверяем пробные детали. Производство запускаем только после подтверждения качества.",
+          "Перед серией — наладка режима и пробные детали. Серийный выпуск запускаем после подтверждения качества.",
         image: "/advantages/adv-04-trial.jpg",
         imageAlt: "Пробные алюминиевые отливки после наладки режима литья",
       },
       {
         title: "Механическая обработка",
         description:
-          "При необходимости выполняем токарную и фрезерную обработку по техническому заданию заказчика.",
+          "При необходимости организуем токарную и фрезерную обработку по техническому заданию заказчика.",
         image: "/advantages/adv-05-machining.jpg",
         imageAlt: "Механическая обработка алюминиевой отливки — токарная и фрезерная",
       },
       {
         title: "Ремонт вашей оснастки",
         description:
-          "Принимаем существующую пресс-форму, проводим диагностику и текущий ремонт, после чего запускаем литьё.",
+          "Принимаем вашу пресс-форму: диагностика, ремонт и подготовка к запуску заказа.",
         image: "/advantages/adv-06-tooling.jpg",
         imageAlt: "Диагностика и ремонт пресс-формы для литья под давлением",
       },
@@ -1636,7 +1613,9 @@ const ru: SiteContent = {
   },
   footer: {
     blurb:
-      "Невская Литейная Компания организует производство точных алюминиевых деталей методом литья под давлением. Полный цикл — от чертежа до готовой детали. Серии от 200 шт.",
+      "Невская Литейная Компания организует производство точных алюминиевых деталей методом литья под давлением. Берём проект на себя — от чертежа до готовой детали. Серии от 200 шт.",
+    legalNote:
+      "Невская Литейная Компания — коммерческое наименование, используемое ООО «ТД НСК».",
     columns: [
       {
         title: "Компания",
