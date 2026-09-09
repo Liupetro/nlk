@@ -324,6 +324,7 @@ const en: SiteContent = {
     primaryCta: { label: "Calculate from drawing", href: "/contact" },
     floatingStats: [
       { value: "10+", unit: "", label: "years of experience" },
+      { value: "from 200", unit: "", label: "pcs" },
       { value: "98%", unit: "", label: "on-time deliveries" },
     ],
   },
@@ -337,16 +338,22 @@ const en: SiteContent = {
         description: "In aluminum high-pressure die casting",
       },
       {
+        value: 200,
+        suffix: "",
+        label: "from 200 pcs",
+        description: "Orders from 200 pieces",
+      },
+      {
+        value: 24,
+        suffix: "h",
+        label: "quote from drawing",
+        description: "Lead time and cost within one day",
+      },
+      {
         value: 98,
         suffix: "%",
         label: "on time",
         description: "Orders shipped on schedule",
-      },
-      {
-        value: 1,
-        suffix: "",
-        label: "supplier",
-        description: "We take the project on — from drawing to finished part",
       },
     ],
   },
@@ -1005,6 +1012,7 @@ const ru: SiteContent = {
     primaryCta: { label: "Рассчитать по чертежу", href: "/contact" },
     floatingStats: [
       { value: "10+", unit: "", label: "лет опыта" },
+      { value: "от 200", unit: "", label: "шт." },
       { value: "98 %", unit: "", label: "поставок в срок" },
     ],
   },
@@ -1018,16 +1026,22 @@ const ru: SiteContent = {
         description: "В литье алюминия под давлением",
       },
       {
+        value: 200,
+        suffix: "",
+        label: "от 200 шт.",
+        description: "Берём заказы от 200 штук",
+      },
+      {
+        value: 24,
+        suffix: " ч",
+        label: "расчёт по чертежу",
+        description: "Ориентир по сроку и стоимости за сутки",
+      },
+      {
         value: 98,
         suffix: "%",
         label: "в срок",
         description: "Заказов отгружаем точно в срок",
-      },
-      {
-        value: 1,
-        suffix: "",
-        label: "поставщик",
-        description: "Берём проект на себя — от чертежа до готовой детали",
       },
     ],
   },
