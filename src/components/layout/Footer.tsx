@@ -66,14 +66,19 @@ export function Footer() {
           </div>
         </div>
 
-        <div className="mt-14 pt-8 border-t border-white/8 flex flex-col sm:flex-row gap-4 sm:items-center sm:justify-between">
-          <p className="text-xs text-white/40">{copyright}</p>
-          <Link
-            href={t.footer.privacyHref}
-            className="text-xs text-white/40 hover:text-accent-bright transition-colors sm:text-right"
-          >
-            {t.footer.privacyLabel}
-          </Link>
+        <div className="mt-14 pt-8 border-t border-white/8 space-y-4">
+          <p className="text-xs leading-relaxed text-white/40 max-w-3xl">
+            {t.footer.legalNote}
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4 sm:items-center sm:justify-between">
+            <p className="text-xs text-white/40">{copyright}</p>
+            <Link
+              href={t.footer.privacyHref}
+              className="text-xs text-white/40 hover:text-accent-bright transition-colors sm:text-right"
+            >
+              {t.footer.privacyLabel}
+            </Link>
+          </div>
         </div>
       </Container>
     </footer>

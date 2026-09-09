@@ -138,7 +138,7 @@ export function Hero() {
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, delay: 0.45 }}
-            className="mt-12 grid w-full max-w-lg grid-cols-1 sm:grid-cols-3 gap-3"
+            className="mt-12 grid w-full max-w-lg grid-cols-1 sm:grid-cols-2 gap-3"
           >
             {hero.floatingStats.map((stat) => (
               <div
