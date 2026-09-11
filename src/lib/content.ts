@@ -350,6 +350,12 @@ const en: SiteContent = {
         description: "Lead time and cost within one day",
       },
       {
+        value: 400,
+        suffix: " t",
+        label: "clamping force",
+        description: "",
+      },
+      {
         value: 98,
         suffix: "%",
         label: "on time",
@@ -1036,6 +1042,12 @@ const ru: SiteContent = {
         suffix: " ч",
         label: "расчёт по чертежу",
         description: "Ориентир по сроку и стоимости за сутки",
+      },
+      {
+        value: 400,
+        suffix: " т",
+        label: "усилие запирания",
+        description: "",
       },
       {
         value: 98,

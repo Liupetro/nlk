@@ -16,7 +16,7 @@ export function TrustBar() {
             {trustBar.eyebrow}
           </p>
         </Reveal>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-6 lg:gap-4">
           {trustBar.stats.map((stat, i) => (
             <Reveal key={stat.label} delay={i * 0.06} className="text-center lg:text-left">
               <div className="px-2">
@@ -29,7 +29,9 @@ export function TrustBar() {
                   />
                 </div>
                 <p className="mt-2 text-sm font-medium text-white/80">{stat.label}</p>
-                <p className="mt-0.5 text-xs text-white/40">{stat.description}</p>
+                {stat.description ? (
+                  <p className="mt-0.5 text-xs text-white/40">{stat.description}</p>
+                ) : null}
               </div>
             </Reveal>
           ))}
