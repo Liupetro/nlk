@@ -106,12 +106,11 @@ export async function sendLeadClient(
     files: rawFiles.map((file) => ({ name: file.name, content: "" })),
   };
 
-  const created = await postProxy(payload, PROXY_TIMEOUT_MS);
-
   const title =
     (meta.source === "estimator" ? "Zayavka na raschet" : "Zayavka s sayta") +
     " — " +
     (meta.subjectName || payload.company || payload.name || "aldetali.ru");
+
   notifyZakaz({
     subject: title,
     source: payload.source,
@@ -122,11 +121,13 @@ export async function sendLeadClient(
     material: payload.materialLabel || payload.material,
     message: payload.message,
     files: rawFiles.map((f) => f.name).join(", ") || "net",
-    bitrix_deal: String(created.id || ""),
+    bitrix_deal: "",
     page_url: payload.pageUrl,
     submitted_at_msk: payload.submittedAtMsk,
-    note: "Kopiya: sdelka v Bitrix24. Faili dogonyayut v kartochke.",
+    note: "Kopiya s formy. Sdelka v Bitrix24 sozdaetsya otdelno.",
   });
+
+  const created = await postProxy(payload, PROXY_TIMEOUT_MS);
 
   if (!rawFiles.length || !created.id) return;
 
