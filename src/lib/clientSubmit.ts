@@ -2,7 +2,7 @@
 const WEB3FORMS_URL = "https://api.web3forms.com/submit";
 const MAX_FILES = 5;
 const MAX_FILE_BYTES = 8 * 1024 * 1024;
-const PROXY_TIMEOUT_MS = 20000;
+const PROXY_TIMEOUT_MS = 25000;
 
 export type LeadMeta = {
   source: "contact" | "estimator";
@@ -89,6 +89,11 @@ export async function sendLeadClient(
     rawFiles.push(value);
   }
 
+  const files = [];
+  for (const file of rawFiles) {
+    files.push({ name: file.name, content: await fileToBase64(file) });
+  }
+
   const payload = {
     source: meta.source,
     name: field(data, "name"),
@@ -103,7 +108,7 @@ export async function sendLeadClient(
     pageUrl: window.location.href,
     submittedAtMsk: formatMskNow(),
     userAgent: navigator.userAgent.slice(0, 400),
-    files: rawFiles.map((file) => ({ name: file.name, content: "" })),
+    files,
   };
 
   const title =
@@ -127,31 +132,14 @@ export async function sendLeadClient(
     note: "Kopiya s formy. Sdelka v Bitrix24 sozdaetsya otdelno.",
   });
 
-  let created: { ok?: boolean; id?: number; error?: string } = { ok: true };
   try {
-    created = await postProxy(payload, PROXY_TIMEOUT_MS);
+    await postProxy(payload, PROXY_TIMEOUT_MS);
   } catch (err: unknown) {
     const name = err instanceof Error ? err.name : "";
     const msg = err instanceof Error ? err.message : "";
     if (name === "AbortError" || msg.includes("Failed to fetch") || msg.includes("NetworkError")) {
-      created = { ok: true };
-    } else {
-      throw err;
+      return;
     }
+    throw err;
   }
-
-  if (!rawFiles.length) return;
-
-  void (async () => {
-    const files = [];
-    for (const file of rawFiles) {
-      files.push({ name: file.name, content: await fileToBase64(file) });
-    }
-    try {
-      await postProxy(
-        { dealId: created.id || 0, email: payload.email, files },
-        60000,
-      );
-    } catch {}
-  })();
 }
