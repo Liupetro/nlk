@@ -2,7 +2,7 @@
 const WEB3FORMS_URL = "https://api.web3forms.com/submit";
 const MAX_FILES = 5;
 const MAX_FILE_BYTES = 8 * 1024 * 1024;
-const PROXY_TIMEOUT_MS = 8000;
+const PROXY_TIMEOUT_MS = 12000;
 
 export type LeadMeta = {
   source: "contact" | "estimator";
@@ -53,16 +53,40 @@ function notifyZakaz(payload: Record<string, string>): void {
   void fetch(WEB3FORMS_URL, { method: "POST", body: fd });
 }
 
+async function postProxy(body: unknown, timeoutMs: number): Promise<{ ok?: boolean; id?: number; error?: string }> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const res = await fetch(BITRIX_PROXY_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify(body),
+      signal: ctrl.signal,
+    });
+    const json = (await res.json().catch(() => null)) as {
+      ok?: boolean;
+      id?: number;
+      error?: string;
+    } | null;
+    if (!res.ok || !json?.ok) {
+      throw new Error(json?.error || "Bitrix proxy rejected");
+    }
+    return json;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export async function sendLeadClient(
   data: FormData,
   meta: LeadMeta,
 ): Promise<void> {
-  const files: { name: string; content: string }[] = [];
+  const rawFiles: File[] = [];
   for (const value of data.values()) {
     if (!(value instanceof File) || value.size <= 0) continue;
     if (value.size > MAX_FILE_BYTES) throw new Error("File too large");
-    if (files.length >= MAX_FILES) break;
-    files.push({ name: value.name, content: await fileToBase64(value) });
+    if (rawFiles.length >= MAX_FILES) break;
+    rawFiles.push(value);
   }
 
   const payload = {
@@ -79,14 +103,15 @@ export async function sendLeadClient(
     pageUrl: window.location.href,
     submittedAtMsk: formatMskNow(),
     userAgent: navigator.userAgent.slice(0, 400),
-    files,
+    files: rawFiles.map((file) => ({ name: file.name, content: "" })),
   };
+
+  const created = await postProxy(payload, PROXY_TIMEOUT_MS);
 
   const title =
     (meta.source === "estimator" ? "Zayavka na raschet" : "Zayavka s sayta") +
     " — " +
     (meta.subjectName || payload.company || payload.name || "aldetali.ru");
-
   notifyZakaz({
     subject: title,
     source: payload.source,
@@ -96,33 +121,22 @@ export async function sendLeadClient(
     email: payload.email,
     material: payload.materialLabel || payload.material,
     message: payload.message,
-    files: files.map((f) => f.name).join(", ") || "net",
+    files: rawFiles.map((f) => f.name).join(", ") || "net",
+    bitrix_deal: String(created.id || ""),
     page_url: payload.pageUrl,
     submitted_at_msk: payload.submittedAtMsk,
-    note: "Kopiya: sdelka sozdaetsya v Bitrix24. Faili v kartochke sdelki.",
+    note: "Kopiya: sdelka v Bitrix24. Faili dogonyayut v kartochke.",
   });
 
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), PROXY_TIMEOUT_MS);
-  try {
-    const res = await fetch(BITRIX_PROXY_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify(payload),
-      signal: ctrl.signal,
-    });
-    const json = (await res.json().catch(() => null)) as {
-      ok?: boolean;
-      error?: string;
-    } | null;
-    if (!res.ok || !json?.ok) {
-      throw new Error(json?.error || "Bitrix proxy rejected");
+  if (!rawFiles.length || !created.id) return;
+
+  void (async () => {
+    const files = [];
+    for (const file of rawFiles) {
+      files.push({ name: file.name, content: await fileToBase64(file) });
     }
-  } catch (err) {
-    if (!(err instanceof DOMException && err.name === "AbortError")) {
-      throw err;
-    }
-  } finally {
-    clearTimeout(timer);
-  }
+    try {
+      await postProxy({ dealId: created.id, files }, 60000);
+    } catch {}
+  })();
 }
