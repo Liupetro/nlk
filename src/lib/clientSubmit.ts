@@ -127,7 +127,18 @@ export async function sendLeadClient(
     note: "Kopiya s formy. Sdelka v Bitrix24 sozdaetsya otdelno.",
   });
 
-  const created = await postProxy(payload, PROXY_TIMEOUT_MS);
+  let created: { ok?: boolean; id?: number; error?: string };
+  try {
+    created = await postProxy(payload, PROXY_TIMEOUT_MS);
+  } catch (err: unknown) {
+    const name = err instanceof Error ? err.name : "";
+    const msg = err instanceof Error ? err.message : "";
+    if (name === "AbortError" || msg.includes("Failed to fetch") || msg.includes("NetworkError")) {
+      created = { ok: true };
+    } else {
+      throw err;
+    }
+  }
 
   if (!rawFiles.length || !created.id) return;
 
