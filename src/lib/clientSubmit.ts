@@ -2,7 +2,7 @@
 const WEB3FORMS_URL = "https://api.web3forms.com/submit";
 const MAX_FILES = 5;
 const MAX_FILE_BYTES = 8 * 1024 * 1024;
-const PROXY_TIMEOUT_MS = 12000;
+const PROXY_TIMEOUT_MS = 20000;
 
 export type LeadMeta = {
   source: "contact" | "estimator";
@@ -127,7 +127,7 @@ export async function sendLeadClient(
     note: "Kopiya s formy. Sdelka v Bitrix24 sozdaetsya otdelno.",
   });
 
-  let created: { ok?: boolean; id?: number; error?: string };
+  let created: { ok?: boolean; id?: number; error?: string } = { ok: true };
   try {
     created = await postProxy(payload, PROXY_TIMEOUT_MS);
   } catch (err: unknown) {
@@ -140,7 +140,7 @@ export async function sendLeadClient(
     }
   }
 
-  if (!rawFiles.length || !created.id) return;
+  if (!rawFiles.length) return;
 
   void (async () => {
     const files = [];
@@ -148,7 +148,10 @@ export async function sendLeadClient(
       files.push({ name: file.name, content: await fileToBase64(file) });
     }
     try {
-      await postProxy({ dealId: created.id, files }, 60000);
+      await postProxy(
+        { dealId: created.id || 0, email: payload.email, files },
+        60000,
+      );
     } catch {}
   })();
 }
