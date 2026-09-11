@@ -2,6 +2,7 @@
 const WEB3FORMS_URL = "https://api.web3forms.com/submit";
 const MAX_FILES = 5;
 const MAX_FILE_BYTES = 8 * 1024 * 1024;
+const PROXY_TIMEOUT_MS = 8000;
 
 export type LeadMeta = {
   source: "contact" | "estimator";
@@ -81,24 +82,11 @@ export async function sendLeadClient(
     files,
   };
 
-  const res = await fetch(BITRIX_PROXY_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Accept: "application/json" },
-    body: JSON.stringify(payload),
-  });
-  const json = (await res.json().catch(() => null)) as {
-    ok?: boolean;
-    error?: string;
-    id?: number;
-  } | null;
-  if (!res.ok || !json?.ok) {
-    throw new Error(json?.error || "Bitrix proxy rejected");
-  }
-
   const title =
     (meta.source === "estimator" ? "Zayavka na raschet" : "Zayavka s sayta") +
     " — " +
     (meta.subjectName || payload.company || payload.name || "aldetali.ru");
+
   notifyZakaz({
     subject: title,
     source: payload.source,
@@ -109,9 +97,32 @@ export async function sendLeadClient(
     material: payload.materialLabel || payload.material,
     message: payload.message,
     files: files.map((f) => f.name).join(", ") || "net",
-    bitrix_deal: String(json.id || ""),
     page_url: payload.pageUrl,
     submitted_at_msk: payload.submittedAtMsk,
-    note: "Kopiya: sdelka v Bitrix24. Faili v kartochke sdelki.",
+    note: "Kopiya: sdelka sozdaetsya v Bitrix24. Faili v kartochke sdelki.",
   });
+
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), PROXY_TIMEOUT_MS);
+  try {
+    const res = await fetch(BITRIX_PROXY_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify(payload),
+      signal: ctrl.signal,
+    });
+    const json = (await res.json().catch(() => null)) as {
+      ok?: boolean;
+      error?: string;
+    } | null;
+    if (!res.ok || !json?.ok) {
+      throw new Error(json?.error || "Bitrix proxy rejected");
+    }
+  } catch (err) {
+    if (!(err instanceof DOMException && err.name === "AbortError")) {
+      throw err;
+    }
+  } finally {
+    clearTimeout(timer);
+  }
 }
