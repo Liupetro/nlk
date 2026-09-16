@@ -83,27 +83,30 @@ async function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function postProxyWithRetries(
-  body: unknown,
-  timeoutMs: number,
-  retries: number,
-): Promise<{ ok?: boolean; id?: number; error?: string }> {
+async function postProxyWithRetries(body: unknown, timeoutMs: number, retries: number): Promise<{ ok?: boolean; id?: number; error?: string }> {
   let lastError: Error | null = null;
+  
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
-      return await postProxy(body, timeoutMs);
+      const result = await postProxy(body, timeoutMs);
+      return result;
     } catch (err: unknown) {
       lastError = err instanceof Error ? err : new Error(String(err));
-      const name = lastError.name;
-      const msg = lastError.message;
-      const net =
-        name === "AbortError" ||
-        msg.includes("Failed to fetch") ||
-        msg.includes("NetworkError");
-      if (!net) throw lastError;
-      if (attempt < retries) await sleep(RETRY_DELAY_MS);
+      
+      if (
+        !(err instanceof Error && err.name === "AbortError") &&
+        !(err instanceof TypeError && err.message.includes("Failed to fetch")) &&
+        !(err instanceof TypeError && err.message.includes("NetworkError"))
+      ) {
+        throw err;
+      }
+      
+      if (attempt < retries) {
+        await sleep(RETRY_DELAY_MS);
+      }
     }
   }
+  
   throw lastError || new Error("Bitrix proxy unreachable");
 }
 
@@ -117,11 +120,6 @@ export async function sendLeadClient(
     if (value.size > MAX_FILE_BYTES) throw new Error("File too large");
     if (rawFiles.length >= MAX_FILES) break;
     rawFiles.push(value);
-  }
-
-  const files = [];
-  for (const file of rawFiles) {
-    files.push({ name: file.name, content: await fileToBase64(file) });
   }
 
   const payload = {
@@ -138,7 +136,7 @@ export async function sendLeadClient(
     pageUrl: window.location.href,
     submittedAtMsk: formatMskNow(),
     userAgent: navigator.userAgent.slice(0, 400),
-    files,
+    files: rawFiles.map((file) => ({ name: file.name, content: "" })),
   };
 
   const title =
@@ -162,5 +160,18 @@ export async function sendLeadClient(
     note: "Kopiya s formy. Sdelka v Bitrix24 sozdaetsya otdelno.",
   });
 
-  await postProxyWithRetries(payload, PROXY_TIMEOUT_MS, PROXY_RETRIES);
+  const created = await postProxyWithRetries(payload, PROXY_TIMEOUT_MS, PROXY_RETRIES);
+
+  if (!rawFiles.length || !created.id) return;
+
+  void (async () => {
+    const filesWithContent = [];
+    for (const file of rawFiles) {
+      filesWithContent.push({ name: file.name, content: await fileToBase64(file) });
+    }
+    try {
+      await postProxy({ dealId: created.id, email: payload.email, files: filesWithContent }, 60000);
+    } catch {
+    }
+  })();
 }
