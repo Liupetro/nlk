@@ -2,7 +2,9 @@
 const WEB3FORMS_URL = "https://api.web3forms.com/submit";
 const MAX_FILES = 5;
 const MAX_FILE_BYTES = 8 * 1024 * 1024;
-const PROXY_TIMEOUT_MS = 25000;
+const PROXY_TIMEOUT_MS = 20000;
+const PROXY_RETRIES = 2;
+const RETRY_DELAY_MS = 1000;
 
 export type LeadMeta = {
   source: "contact" | "estimator";
@@ -77,6 +79,34 @@ async function postProxy(body: unknown, timeoutMs: number): Promise<{ ok?: boole
   }
 }
 
+async function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function postProxyWithRetries(
+  body: unknown,
+  timeoutMs: number,
+  retries: number,
+): Promise<{ ok?: boolean; id?: number; error?: string }> {
+  let lastError: Error | null = null;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await postProxy(body, timeoutMs);
+    } catch (err: unknown) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+      const name = lastError.name;
+      const msg = lastError.message;
+      const net =
+        name === "AbortError" ||
+        msg.includes("Failed to fetch") ||
+        msg.includes("NetworkError");
+      if (!net) throw lastError;
+      if (attempt < retries) await sleep(RETRY_DELAY_MS);
+    }
+  }
+  throw lastError || new Error("Bitrix proxy unreachable");
+}
+
 export async function sendLeadClient(
   data: FormData,
   meta: LeadMeta,
@@ -132,14 +162,5 @@ export async function sendLeadClient(
     note: "Kopiya s formy. Sdelka v Bitrix24 sozdaetsya otdelno.",
   });
 
-  try {
-    await postProxy(payload, PROXY_TIMEOUT_MS);
-  } catch (err: unknown) {
-    const name = err instanceof Error ? err.name : "";
-    const msg = err instanceof Error ? err.message : "";
-    if (name === "AbortError" || msg.includes("Failed to fetch") || msg.includes("NetworkError")) {
-      return;
-    }
-    throw err;
-  }
+  await postProxyWithRetries(payload, PROXY_TIMEOUT_MS, PROXY_RETRIES);
 }
