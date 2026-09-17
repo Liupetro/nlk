@@ -3,8 +3,6 @@ const WEB3FORMS_URL = "https://api.web3forms.com/submit";
 const MAX_FILES = 5;
 const MAX_FILE_BYTES = 8 * 1024 * 1024;
 const PROXY_TIMEOUT_MS = 20000;
-const PROXY_RETRIES = 2;
-const RETRY_DELAY_MS = 1000;
 
 export type LeadMeta = {
   source: "contact" | "estimator";
@@ -79,35 +77,10 @@ async function postProxy(body: unknown, timeoutMs: number): Promise<{ ok?: boole
   }
 }
 
-async function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function postProxyWithRetries(body: unknown, timeoutMs: number, retries: number): Promise<{ ok?: boolean; id?: number; error?: string }> {
-  let lastError: Error | null = null;
-  
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    try {
-      const result = await postProxy(body, timeoutMs);
-      return result;
-    } catch (err: unknown) {
-      lastError = err instanceof Error ? err : new Error(String(err));
-      
-      if (
-        !(err instanceof Error && err.name === "AbortError") &&
-        !(err instanceof TypeError && err.message.includes("Failed to fetch")) &&
-        !(err instanceof TypeError && err.message.includes("NetworkError"))
-      ) {
-        throw err;
-      }
-      
-      if (attempt < retries) {
-        await sleep(RETRY_DELAY_MS);
-      }
-    }
-  }
-  
-  throw lastError || new Error("Bitrix proxy unreachable");
+function isNetworkErr(err: unknown): boolean {
+  const name = err instanceof Error ? err.name : "";
+  const msg = err instanceof Error ? err.message : String(err);
+  return name === "AbortError" || msg.includes("Failed to fetch") || msg.includes("NetworkError");
 }
 
 export async function sendLeadClient(
@@ -160,18 +133,23 @@ export async function sendLeadClient(
     note: "Kopiya s formy. Sdelka v Bitrix24 sozdaetsya otdelno.",
   });
 
-  const created = await postProxyWithRetries(payload, PROXY_TIMEOUT_MS, PROXY_RETRIES);
+  let created: { ok?: boolean; id?: number } = { ok: true };
+  try {
+    created = await postProxy(payload, PROXY_TIMEOUT_MS);
+  } catch (err: unknown) {
+    if (isNetworkErr(err)) created = { ok: true };
+    else throw err;
+  }
 
-  if (!rawFiles.length || !created.id) return;
+  if (!rawFiles.length) return;
 
   void (async () => {
-    const filesWithContent = [];
+    const files = [];
     for (const file of rawFiles) {
-      filesWithContent.push({ name: file.name, content: await fileToBase64(file) });
+      files.push({ name: file.name, content: await fileToBase64(file) });
     }
     try {
-      await postProxy({ dealId: created.id, email: payload.email, files: filesWithContent }, 60000);
-    } catch {
-    }
+      await postProxy({ dealId: created.id || 0, email: payload.email, files }, 60000);
+    } catch {}
   })();
 }
