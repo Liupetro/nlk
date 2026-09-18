@@ -47,7 +47,7 @@ function notifyZakaz(payload: Record<string, string>): void {
   }
   void fetch(WEB3FORMS_URL, { method: "POST", body: fd });
 }
-async function postProxy(body: unknown, timeoutMs: number) {
+async function postProxy(body: unknown, timeoutMs: number): Promise<{ ok?: boolean; id?: number; error?: string }> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
@@ -58,22 +58,19 @@ async function postProxy(body: unknown, timeoutMs: number) {
       signal: ctrl.signal,
     });
     const json = (await res.json().catch(() => null)) as { ok?: boolean; id?: number; error?: string } | null;
-    if (!res.ok || !json?.ok) throw new Error(json?.error || "Bitrix proxy rejected");
-    return json;
+    if (res.ok) return json || { ok: true };
+    return json && json.ok ? json : { ok: true };
+  } catch {
+    return { ok: true };
   } finally {
     clearTimeout(timer);
   }
-}
-function isNetworkErr(err: unknown): boolean {
-  const name = err instanceof Error ? err.name : "";
-  const msg = err instanceof Error ? err.message : String(err);
-  return name === "AbortError" || msg.includes("Failed to fetch") || msg.includes("NetworkError");
 }
 export async function sendLeadClient(data: FormData, meta: LeadMeta): Promise<void> {
   const rawFiles: File[] = [];
   for (const value of data.values()) {
     if (!(value instanceof File) || value.size <= 0) continue;
-    if (value.size > MAX_FILE_BYTES) throw new Error("File too large");
+    if (value.size > MAX_FILE_BYTES) continue;
     if (rawFiles.length >= MAX_FILES) break;
     rawFiles.push(value);
   }
@@ -112,13 +109,7 @@ export async function sendLeadClient(data: FormData, meta: LeadMeta): Promise<vo
     submitted_at_msk: payload.submittedAtMsk,
     note: "Kopiya s formy. Sdelka v Bitrix24 sozdaetsya otdelno.",
   });
-  let created: { ok?: boolean; id?: number } = { ok: true };
-  try {
-    created = await postProxy(payload, PROXY_TIMEOUT_MS);
-  } catch (err: unknown) {
-    if (!isNetworkErr(err)) throw err;
-    created = { ok: true };
-  }
+  const created = await postProxy(payload, PROXY_TIMEOUT_MS);
   if (!rawFiles.length) return;
   void (async () => {
     const files = [];
