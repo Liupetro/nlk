@@ -1,12 +1,13 @@
-﻿const BITRIX_PROXY_URL = "https://nlk-bitrix-proxy.nlk-ion.workers.dev";
-const WEB3FORMS_URL = "https://api.web3forms.com/submit";
+﻿const MAIL_PROXY_URL = "https://nlk-bitrix-proxy.nlk-ion.workers.dev";
 const MAX_FILES = 5;
 const MAX_FILE_BYTES = 8 * 1024 * 1024;
-const PROXY_TIMEOUT_MS = 8000;
+const MAX_TOTAL_BYTES = 9 * 1024 * 1024;
+
 export type LeadMeta = {
   source: "contact" | "estimator";
   subjectName?: string;
 };
+
 function formatMskNow(): string {
   return new Intl.DateTimeFormat("ru-RU", {
     timeZone: "Europe/Moscow",
@@ -18,10 +19,12 @@ function formatMskNow(): string {
     hour12: false,
   }).format(new Date());
 }
+
 function field(data: FormData, name: string): string {
   const value = data.get(name);
   return typeof value === "string" ? value.trim() : "";
 }
+
 function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -34,50 +37,32 @@ function fileToBase64(file: File): Promise<string> {
     reader.readAsDataURL(file);
   });
 }
-function notifyZakaz(payload: Record<string, string>): void {
-  const key = (process.env.NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY ?? "").trim();
-  if (!key) return;
-  const fd = new FormData();
-  fd.append("access_key", key);
-  fd.append("subject", payload.subject);
-  fd.append("from_name", "aldetali.ru");
-  for (const [name, value] of Object.entries(payload)) {
-    if (name === "subject") continue;
-    fd.append(name, value);
-  }
-  void fetch(WEB3FORMS_URL, { method: "POST", body: fd });
-}
-async function postProxy(body: unknown, timeoutMs: number): Promise<{ ok?: boolean; id?: number; error?: string }> {
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
-  try {
-    const res = await fetch(BITRIX_PROXY_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify(body),
-      signal: ctrl.signal,
-    });
-    const json = (await res.json().catch(() => null)) as { ok?: boolean; id?: number; error?: string } | null;
-    if (res.ok) return json || { ok: true };
-    return json && json.ok ? json : { ok: true };
-  } catch {
-    return { ok: true };
-  } finally {
-    clearTimeout(timer);
-  }
-}
+
 export async function sendLeadClient(data: FormData, meta: LeadMeta): Promise<void> {
   const rawFiles: File[] = [];
+  let total = 0;
   for (const value of data.values()) {
     if (!(value instanceof File) || value.size <= 0) continue;
-    if (value.size > MAX_FILE_BYTES) continue;
+    if (value.size > MAX_FILE_BYTES) throw new Error("File too large");
     if (rawFiles.length >= MAX_FILES) break;
+    if (total + value.size > MAX_TOTAL_BYTES) break;
     rawFiles.push(value);
+    total += value.size;
   }
+  const files = [];
+  for (const file of rawFiles) {
+    files.push({ name: file.name, content: await fileToBase64(file) });
+  }
+  const name = field(data, "name");
+  const company = field(data, "company");
   const payload = {
     source: meta.source,
-    name: field(data, "name"),
-    company: field(data, "company"),
+    subject:
+      (meta.source === "estimator" ? "Заявка на расчёт" : "Заявка с сайта") +
+      " — " +
+      (meta.subjectName || company || name || "aldetali.ru"),
+    name,
+    company,
     phone: field(data, "phone"),
     email: field(data, "email"),
     material: field(data, "material"),
@@ -87,37 +72,13 @@ export async function sendLeadClient(data: FormData, meta: LeadMeta): Promise<vo
     message: field(data, "message"),
     pageUrl: window.location.href,
     submittedAtMsk: formatMskNow(),
-    userAgent: navigator.userAgent.slice(0, 400),
-    files: rawFiles.map((file) => ({ name: file.name, content: "" })),
+    files,
   };
-  const title =
-    (meta.source === "estimator" ? "Zayavka na raschet" : "Zayavka s sayta") +
-    " — " +
-    (meta.subjectName || payload.company || payload.name || "aldetali.ru");
-  notifyZakaz({
-    subject: title,
-    source: payload.source,
-    name: payload.name,
-    company: payload.company,
-    phone: payload.phone,
-    email: payload.email,
-    material: payload.materialLabel || payload.material,
-    message: payload.message,
-    files: rawFiles.map((f) => f.name).join(", ") || "net",
-    bitrix_deal: "",
-    page_url: payload.pageUrl,
-    submitted_at_msk: payload.submittedAtMsk,
-    note: "Kopiya s formy. Sdelka v Bitrix24 sozdaetsya otdelno.",
+  const res = await fetch(MAIL_PROXY_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(payload),
   });
-  const created = await postProxy(payload, PROXY_TIMEOUT_MS);
-  if (!rawFiles.length) return;
-  void (async () => {
-    const files = [];
-    for (const file of rawFiles) {
-      files.push({ name: file.name, content: await fileToBase64(file) });
-    }
-    try {
-      await postProxy({ dealId: created.id || 0, email: payload.email, files }, 60000);
-    } catch {}
-  })();
+  const json = (await res.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
+  if (!res.ok || !json?.ok) throw new Error(json?.error || "Mail rejected");
 }
